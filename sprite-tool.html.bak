@@ -1,0 +1,3459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频转精灵图工具</title>
+    <style>
+        :root {
+            --bg-primary: #0c0f1a;
+            --bg-secondary: #141829;
+            --bg-card: rgba(22, 27, 48, 0.7);
+            --border: rgba(255, 255, 255, 0.06);
+            --border-hover: rgba(99, 179, 237, 0.25);
+            --accent: #63b3ed;
+            --accent-glow: rgba(99, 179, 237, 0.15);
+            --accent2: #a78bfa;
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+            --text-muted: #64748b;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --radius: 12px;
+            --radius-lg: 16px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            min-height: 100vh;
+            color: var(--text);
+            padding: 24px 20px 60px;
+            background-image:
+                radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99, 179, 237, 0.08) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 50% at 80% 100%, rgba(167, 139, 250, 0.06) 0%, transparent 70%);
+        }
+
+        .container { max-width: 960px; margin: 0 auto; }
+
+        /* ── Header ── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 0 36px;
+            position: relative;
+        }
+        .header-center { text-align: center; }
+        .header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #f1f5f9;
+            margin-bottom: 8px;
+        }
+        .header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+        .settings-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+        }
+        .header-actions {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .settings-btn:hover { color: var(--accent); border-color: var(--border-hover); }
+        .settings-btn svg { width: 20px; height: 20px; }
+        .settings-btn .session-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            margin-left: 6px;
+        }
+        .settings-btn .session-dot.active { background: var(--success); }
+
+        /* ── Modal ── */
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.visible { display: flex; }
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            max-width: 480px;
+            width: 90%;
+        }
+        .modal h3 {
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            color: var(--text);
+        }
+        .modal p { color: var(--text-dim); font-size: 0.85rem; line-height: 1.6; margin-bottom: 12px; }
+        .modal input[type="text"] {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+        }
+        .modal input[type="text"]:focus { border-color: var(--accent); outline: none; }
+        .modal .btn-row { display: flex; gap: 8px; justify-content: flex-end; }
+
+        /* ── AI Results Grid ── */
+        .ai-results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+        }
+        .ai-result-item {
+            position: relative;
+            border-radius: 8px;
+            border: 2px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s;
+            overflow: hidden;
+        }
+        .ai-result-item:hover { border-color: var(--border-hover); }
+        .ai-result-item.selected { border-color: var(--accent); box-shadow: 0 0 12px rgba(99, 179, 237, 0.2); }
+        .ai-result-item img { width: 100%; display: block; border-radius: 6px; }
+        .ai-result-item .ai-result-check {
+            position: absolute; top: 6px; right: 6px;
+            width: 22px; height: 22px; border-radius: 50%;
+            background: var(--accent); display: none;
+            align-items: center; justify-content: center;
+        }
+        .ai-result-item.selected .ai-result-check { display: flex; }
+        .ai-result-item .ai-result-actions {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            padding: 8px; display: flex; gap: 4px; justify-content: flex-end;
+            opacity: 0; transition: opacity 0.2s;
+        }
+        .ai-result-item:hover .ai-result-actions { opacity: 1; }
+        .ai-result-item .ai-result-actions button {
+            padding: 4px 8px; font-size: 0.72rem; border-radius: 4px;
+        }
+        .ai-loading {
+            text-align: center; padding: 40px 0; color: var(--text-dim);
+        }
+        .ai-loading .spinner {
+            width: 32px; height: 32px; border: 3px solid var(--border);
+            border-top-color: var(--accent); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Steps ── */
+        .steps {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            margin-bottom: 36px;
+            padding: 0 20px;
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            transition: color 0.3s;
+            cursor: pointer;
+        }
+        .step:hover { color: var(--text-dim); }
+        .step.active { color: var(--accent); }
+        .step.done { color: var(--success); }
+        .step-dot {
+            width: 26px; height: 26px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.72rem; font-weight: 600;
+            border: 2px solid var(--border);
+            background: var(--bg-secondary);
+            transition: all 0.3s;
+            flex-shrink: 0;
+        }
+        .step.active .step-dot {
+            border-color: var(--accent);
+            background: rgba(99, 179, 237, 0.1);
+            color: var(--accent);
+            box-shadow: 0 0 16px rgba(99, 179, 237, 0.2);
+        }
+        .step.done .step-dot {
+            border-color: var(--success);
+            background: rgba(52, 211, 153, 0.12);
+            color: var(--success);
+        }
+        .step-line {
+            width: 32px; height: 2px;
+            background: var(--border);
+            margin: 0 4px;
+            flex-shrink: 0;
+            transition: background 0.3s;
+        }
+        .step-line.done { background: rgba(52, 211, 153, 0.4); }
+
+        /* ── Section Card ── */
+        .section {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+            transition: border-color 0.3s;
+            display: none;
+        }
+        .section.visible { display: block; animation: fadeUp 0.35s ease; }
+        .section:first-of-type { display: block; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 12px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-back:hover {
+            color: var(--text-dim);
+            border-color: rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.03);
+            box-shadow: none;
+            transform: none;
+        }
+        .btn-back svg { width: 14px; height: 14px; }
+
+        /* ── Drop Zone ── */
+        .drop-zone {
+            border: 2px dashed rgba(99, 179, 237, 0.2);
+            border-radius: var(--radius);
+            padding: 52px 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            background: rgba(99, 179, 237, 0.02);
+            position: relative;
+        }
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            border-color: rgba(99, 179, 237, 0.5);
+            background: rgba(99, 179, 237, 0.06);
+        }
+        .drop-zone.dragover {
+            box-shadow: inset 0 0 40px rgba(99, 179, 237, 0.06);
+        }
+        .drop-zone-icon {
+            margin-bottom: 14px;
+            opacity: 0.4;
+        }
+        .drop-zone-icon svg {
+            width: 44px; height: 44px;
+            stroke: var(--accent);
+            fill: none;
+            stroke-width: 1.5;
+        }
+        .drop-zone-text {
+            font-size: 0.95rem;
+            color: var(--text-dim);
+        }
+        .drop-zone-text span {
+            color: var(--accent);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .drop-zone-hint {
+            margin-top: 10px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+        input[type="file"] { display: none; }
+
+        /* ── Video Info ── */
+        .video-info {
+            display: none;
+            margin-top: 16px;
+            padding: 10px 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            font-size: 0.82rem;
+            color: var(--text-dim);
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .video-info.visible {
+            display: flex;
+        }
+        .video-info-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .video-info-item svg {
+            width: 14px; height: 14px;
+            stroke: var(--text-muted);
+            fill: none;
+            stroke-width: 2;
+            flex-shrink: 0;
+        }
+        .video-info-item span {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        /* ── Video Preview ── */
+        .video-preview { display: none; margin-top: 20px; }
+        .video-preview video {
+            max-width: 100%;
+            max-height: 360px;
+            border-radius: var(--radius);
+            background: #000;
+        }
+
+        /* ── Controls ── */
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-top: 20px;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .control-group label {
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+        input[type="number"] {
+            width: 72px;
+            padding: 7px 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.25);
+            color: #fff;
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="number"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.1);
+        }
+        input[type="text"] {
+            padding: 7px 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.25);
+            color: #fff;
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.1);
+        }
+
+        /* ── Buttons ── */
+        button {
+            padding: 9px 22px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #fff;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.25);
+        }
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        button:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            transform: none;
+        }
+        button.secondary {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border);
+        }
+        button.secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--border-hover);
+            box-shadow: none;
+        }
+        button.accent {
+            background: linear-gradient(135deg, #06b6d4, #3b82f6);
+        }
+        button.accent:hover:not(:disabled) {
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.25);
+        }
+        button.success {
+            background: linear-gradient(135deg, #10b981, #06b6d4);
+        }
+        button.success:hover:not(:disabled) {
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.25);
+        }
+        button.danger {
+            background: linear-gradient(135deg, #ef4444, #f97316);
+        }
+        button.danger:hover:not(:disabled) {
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.25);
+        }
+        button.primary-action {
+            padding: 11px 28px;
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        /* ── Frames Grid ── */
+        .frames-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .frames-info {
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+        .frames-info span {
+            color: var(--accent);
+            font-weight: 600;
+        }
+        .frames-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 8px;
+            max-height: 420px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+        .frame-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+            background: rgba(0, 0, 0, 0.25);
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .frame-item:hover {
+            transform: scale(1.04);
+            border-color: rgba(99, 179, 237, 0.35);
+        }
+        .frame-item.selected {
+            border-color: var(--accent);
+            box-shadow: 0 0 12px rgba(99, 179, 237, 0.2);
+        }
+        .frame-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .frame-item .check-indicator {
+            position: absolute;
+            top: 5px; left: 5px;
+            width: 20px; height: 20px;
+            border-radius: 4px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            pointer-events: none;
+        }
+        .frame-item .check-indicator svg {
+            width: 12px; height: 12px;
+            stroke: #fff;
+            stroke-width: 3;
+            fill: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .frame-item.selected .check-indicator {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+        .frame-item.selected .check-indicator svg {
+            opacity: 1;
+        }
+        .frame-number {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            font-size: 0.7rem;
+            padding: 3px 6px;
+            text-align: center;
+        }
+
+        /* ── Color Picker ── */
+        .color-picker-area {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            align-items: flex-start;
+        }
+        .picker-preview { flex: 1; min-width: 280px; }
+        .picker-canvas-container {
+            position: relative;
+            display: inline-block;
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: repeating-conic-gradient(rgba(255,255,255,0.03) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px;
+        }
+        #pickerCanvas {
+            display: block;
+            max-width: 100%;
+            cursor: crosshair;
+        }
+        .picker-cursor {
+            position: absolute;
+            width: 28px; height: 28px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.4);
+            display: none;
+            z-index: 10;
+        }
+        .picker-cursor .preview-color {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+        }
+        .picker-cursor .preview-hex {
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            color: #fff;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+            pointer-events: none;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+        .picker-controls { flex: 0 0 260px; }
+        .color-display {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 20px;
+            padding: 14px 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+        .color-box {
+            width: 40px; height: 40px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .color-value {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+        .slider-group { margin-bottom: 18px; }
+        .slider-group label {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+        .slider-group .val {
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 0.82rem;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 2px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px; height: 16px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(99, 179, 237, 0.3);
+            transition: transform 0.15s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        .picker-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 24px;
+        }
+
+        /* ── Sprite ── */
+        .sprite-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 16px;
+            align-items: flex-end;
+        }
+        .sprite-options .control-group {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+        }
+        .preset-btn {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 4px 10px;
+            border-radius: var(--radius);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .preset-btn:hover { border-color: var(--accent); color: var(--text); }
+        .preset-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .sprite-preview {
+            text-align: center;
+            margin-top: 20px;
+        }
+        #spriteCanvas, #directSpriteCanvas {
+            max-width: 100%;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: repeating-conic-gradient(rgba(255,255,255,0.03) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px;
+        }
+        .sprite-info {
+            margin-top: 14px;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            line-height: 1.8;
+        }
+        .sprite-info strong { color: var(--text); }
+        .export-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ── Hint ── */
+        .hint {
+            background: rgba(99, 179, 237, 0.06);
+            border-left: 3px solid rgba(99, 179, 237, 0.3);
+            padding: 10px 14px;
+            margin-top: 16px;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* ── Pixel Art ── */
+        .pixel-art-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
+            padding: 14px 18px;
+            background: rgba(99, 179, 237, 0.03);
+            border-radius: var(--radius);
+            border: 1px dashed var(--border);
+            width: 100%;
+        }
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        /* ── Progress ── */
+        .progress-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(12, 15, 26, 0.85);
+            backdrop-filter: blur(8px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .progress-box {
+            background: var(--bg-secondary);
+            padding: 36px 48px;
+            border-radius: var(--radius-lg);
+            text-align: center;
+            min-width: 300px;
+            border: 1px solid var(--border);
+        }
+        .progress-text {
+            font-size: 0.95rem;
+            margin-bottom: 20px;
+            color: var(--text);
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        .progress-percent {
+            margin-top: 12px;
+            color: var(--accent);
+            font-size: 1rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ── Toast ── */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            color: #fff;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            animation: toastIn 0.35s ease;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 360px;
+        }
+        .toast svg { width: 16px; height: 16px; flex-shrink: 0; }
+        .toast.info {
+            background: rgba(99, 179, 237, 0.9);
+        }
+        .toast.success {
+            background: rgba(52, 211, 153, 0.9);
+        }
+        .toast.warning {
+            background: rgba(251, 191, 36, 0.9);
+            color: #1a1a1a;
+        }
+        .toast.error {
+            background: rgba(248, 113, 113, 0.9);
+        }
+        .toast.out {
+            animation: toastOut 0.3s ease forwards;
+        }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(40px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(40px); }
+        }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.15); }
+
+        /* ── Responsive ── */
+        @media (max-width: 640px) {
+            body { padding: 16px 12px 40px; }
+            .header { padding: 20px 0 24px; }
+            .header h1 { font-size: 1.35rem; }
+            .section { padding: 20px 16px; }
+            .steps { gap: 0; padding: 0 8px; }
+            .step span { display: none; }
+            .step-line { width: 24px; }
+            .picker-controls { flex: 1 1 100%; }
+            .color-picker-area { gap: 16px; }
+            .frames-grid { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+            .sprite-options { gap: 12px; }
+            .export-bar { gap: 8px; }
+            .progress-box { min-width: 240px; padding: 28px 32px; }
+            .toast-container { top: 12px; right: 12px; left: 12px; }
+            .toast { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-center">
+                <h1>视频转精灵图工具</h1>
+                <p>AI 生成 / 视频拆帧 / 背景抠图 / 精灵图导出</p>
+            </div>
+            <div class="header-actions">
+                <div id="serviceStatus" title="AI 服务状态" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;border-radius:8px;background:var(--bg-secondary,#222);border:1px solid var(--border,#444);font-size:0.8rem;">
+                    <span id="serviceStatusDot" style="width:10px;height:10px;border-radius:50%;background:#888;display:inline-block;"></span>
+                    <span id="serviceStatusText" style="color:var(--text-dim);">检查中...</span>
+                </div>
+                <button class="settings-btn" id="settingsBtn" title="设置">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span class="session-dot" id="sessionDot"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="steps" id="stepsBar">
+            <div class="step active" data-step="1">
+                <div class="step-dot">1</div>
+                <span>AI 生图</span>
+            </div>
+            <div class="step-line"></div>
+            <div class="step" data-step="2">
+                <div class="step-dot">2</div>
+                <span>AI 生视频</span>
+            </div>
+            <div class="step-line"></div>
+            <div class="step" data-step="3">
+                <div class="step-dot">3</div>
+                <span>导入视频</span>
+            </div>
+            <div class="step-line"></div>
+            <div class="step" data-step="4">
+                <div class="step-dot">4</div>
+                <span>选择帧</span>
+            </div>
+            <div class="step-line"></div>
+            <div class="step" data-step="5">
+                <div class="step-dot">5</div>
+                <span>抠图</span>
+            </div>
+            <div class="step-line"></div>
+            <div class="step" data-step="6">
+                <div class="step-dot">6</div>
+                <span>导出</span>
+            </div>
+        </div>
+
+        <!-- AI 生图 -->
+        <div class="section visible" id="aiImageSection">
+            <div class="section-header">
+                <div class="section-title">AI 生图</div>
+            </div>
+            <div class="hint" style="margin-bottom: 16px;">
+                通过 AI 生成图片素材，可作为后续视频生成或精灵图的起点。也可跳过此步骤直接上传视频。
+            </div>
+            <div id="aiImageContent" style="display:none;">
+                <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:280px;">
+                        <div class="control-group" style="flex-direction:column;align-items:stretch;gap:12px;">
+                            <label style="font-size:0.9rem;color:var(--text);">描述你想要的图片</label>
+                            <textarea id="aiPromptInput" placeholder="例如：一个像素风格的骑士角色，正面站立，8方向动作..." style="width:100%;min-height:80px;padding:12px;background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.9rem;resize:vertical;outline:none;font-family:inherit;"></textarea>
+                        </div>
+                        <div style="margin-top:12px;">
+                            <div class="control-group" style="margin-bottom:8px;">
+                                <label style="font-size:0.82rem;cursor:pointer;" class="toggle-label">
+                                    <input type="checkbox" id="aiRefImageToggle">
+                                    <span style="color:var(--text-dim);">使用参考图（图生图）</span>
+                                </label>
+                            </div>
+                            <div id="aiRefImageArea" style="display:none;">
+                                <div class="drop-zone" id="aiRefDropZone" style="padding:20px;min-height:80px;">
+                                    <div class="drop-zone-text" style="font-size:0.85rem;">拖拽参考图片到此处，或 <span>点击上传</span></div>
+                                    <div class="drop-zone-hint">支持 JPG, PNG, WebP</div>
+                                </div>
+                                <input type="file" id="aiRefFileInput" accept="image/*" style="display:none;">
+                                <div id="aiRefPreview" style="display:none;margin-top:8px;text-align:center;">
+                                    <img id="aiRefPreviewImg" style="max-width:200px;max-height:150px;border-radius:8px;border:1px solid var(--border);">
+                                    <button class="secondary" id="aiRefClearBtn" style="margin-top:6px;padding:4px 12px;font-size:0.8rem;">移除参考图</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-top:12px;">
+                            <button class="toggle-label" id="aiAdvancedToggle" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.82rem;padding:0;">
+                                高级参数 ▸
+                            </button>
+                            <div id="aiAdvancedParams" style="display:none;margin-top:8px;padding:12px;background:rgba(0,0,0,0.15);border-radius:8px;">
+                                <div class="control-group" style="margin-bottom:8px;">
+                                    <label>模型</label>
+                                    <select id="aiModelSelect" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:#fff;font-size:0.85rem;">
+                                        <option value="jimeng-4.5">jimeng-4.5 (推荐)</option>
+                                        <option value="jimeng-4.6">jimeng-4.6</option>
+                                        <option value="jimeng-5.0">jimeng-5.0 (最新)</option>
+                                    </select>
+                                </div>
+                                <div class="control-group" style="margin-bottom:8px;">
+                                    <label>比例</label>
+                                    <select id="aiRatioSelect" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:#fff;font-size:0.85rem;">
+                                        <option value="1:1">1:1</option>
+                                        <option value="4:3">4:3</option>
+                                        <option value="3:4">3:4</option>
+                                        <option value="16:9">16:9</option>
+                                        <option value="9:16">9:16</option>
+                                    </select>
+                                </div>
+                                <div class="control-group" style="margin-bottom:8px;">
+                                    <label>精细度</label>
+                                    <input type="range" id="aiStrengthSlider" min="0" max="100" value="50" style="flex:1;">
+                                    <span id="aiStrengthValue" style="font-size:0.82rem;color:var(--text-dim);width:30px;">0.5</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-top:16px;display:flex;gap:8px;">
+                            <button class="accent" id="aiGenerateBtn">生成图片</button>
+                            <button class="secondary" id="aiImageSkipBtn2">跳过，直接上传视频</button>
+                        </div>
+                    </div>
+                    <div style="flex:1;min-width:280px;">
+                        <div id="aiImageResults" style="min-height:200px;">
+                            <p style="color:var(--text-muted);text-align:center;padding:60px 0;font-size:0.85rem;">生成结果将显示在这里</p>
+                        </div>
+                        <div id="aiImageActions" style="display:none;margin-top:12px;">
+                            <button class="accent" id="aiToVideoBtn" disabled>使用选中图片生成视频</button>
+                            <button class="secondary" id="aiImageSkipBtn3" style="margin-left:8px;">跳过，直接上传视频</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="aiImageLocked" style="text-align:center;padding:40px 0;">
+                <p style="color:var(--text-dim);margin-bottom:12px;">请先在右上角设置中输入即梦 sessionid 以启用 AI 功能</p>
+                <button class="secondary" id="aiImageSkipBtn">跳过，直接上传视频</button>
+            </div>
+        </div>
+
+        <!-- AI 生视频 -->
+        <div class="section" id="aiVideoSection">
+            <div class="section-header">
+                <div class="section-title">AI 生视频</div>
+                <button class="btn-back" id="backToAiImage">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    返回生图
+                </button>
+            </div>
+            <div class="hint" style="margin-bottom: 16px;">
+                将图片生成动画视频，首帧来自上一步选中的图片。也可跳过此步骤直接上传视频。
+            </div>
+            <div id="aiVideoContent" style="display:none;">
+                <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:280px;">
+                        <div style="margin-bottom:12px;">
+                            <label style="font-size:0.85rem;color:var(--text-dim);display:block;margin-bottom:6px;">首帧图片</label>
+                            <div id="aiVideoFirstFrame" style="text-align:center;padding:20px;border:2px dashed var(--border);border-radius:8px;min-height:100px;">
+                                <p style="color:var(--text-muted);font-size:0.85rem;">等待从 AI 生图步骤传入...</p>
+                            </div>
+                            <input type="file" id="aiVideoFirstFrameFile" accept="image/*" style="display:none;">
+                            <button class="secondary" id="aiVideoFirstFrameUpload" style="margin-top:6px;padding:4px 12px;font-size:0.8rem;">或手动上传首帧</button>
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-size:0.85rem;color:var(--text-dim);display:block;margin-bottom:6px;">尾帧图片（可选）</label>
+                            <div class="drop-zone" id="aiVideoLastFrameDrop" style="padding:16px;min-height:60px;">
+                                <div class="drop-zone-text" style="font-size:0.82rem;">拖拽尾帧图片，或 <span>点击上传</span></div>
+                            </div>
+                            <input type="file" id="aiVideoLastFrameFile" accept="image/*" style="display:none;">
+                            <div id="aiVideoLastFramePreview" style="display:none;margin-top:6px;text-align:center;">
+                                <img id="aiVideoLastFrameImg" style="max-width:150px;max-height:100px;border-radius:6px;border:1px solid var(--border);">
+                                <button class="secondary" id="aiVideoLastFrameClear" style="display:block;margin:4px auto 0;padding:3px 10px;font-size:0.75rem;">移除</button>
+                            </div>
+                        </div>
+                        <div class="control-group" style="flex-direction:column;align-items:stretch;gap:8px;margin-bottom:12px;">
+                            <label style="font-size:0.85rem;color:var(--text-dim);">视频描述</label>
+                            <textarea id="aiVideoPrompt" placeholder="描述视频中的动画效果..." style="width:100%;min-height:60px;padding:10px;background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:0.88rem;resize:vertical;outline:none;font-family:inherit;"></textarea>
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <button class="toggle-label" id="aiVideoAdvancedToggle" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.82rem;padding:0;">
+                                高级参数 ▸
+                            </button>
+                            <div id="aiVideoAdvancedParams" style="display:none;margin-top:8px;padding:12px;background:rgba(0,0,0,0.15);border-radius:8px;">
+                                <div class="control-group" style="margin-bottom:8px;">
+                                    <label>模型</label>
+                                    <select id="aiVideoModelSelect" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:#fff;font-size:0.85rem;">
+                                        <option value="jimeng-video-3.5-pro">jimeng-video-3.5-pro (推荐)</option>
+                                        <option value="jimeng-video-3.0-pro">jimeng-video-3.0-pro</option>
+                                        <option value="jimeng-video-3.0">jimeng-video-3.0</option>
+                                    </select>
+                                </div>
+                                <div class="control-group" style="margin-bottom:8px;">
+                                    <label>时长</label>
+                                    <select id="aiVideoDurationSelect" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:#fff;font-size:0.85rem;">
+                                        <option value="5" selected>5秒</option>
+                                        <option value="10">10秒</option>
+                                    </select>
+                                </div>
+                                <div class="control-group" style="margin-bottom:8px;">
+                                    <label>比例</label>
+                                    <select id="aiVideoRatioSelect" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:#fff;font-size:0.85rem;">
+                                        <option value="16:9" selected>16:9</option>
+                                        <option value="4:3">4:3</option>
+                                        <option value="1:1">1:1</option>
+                                        <option value="9:16">9:16</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <button class="accent" id="aiVideoGenerateBtn">生成视频</button>
+                            <button class="secondary" id="aiVideoSkipBtn2">跳过，直接上传视频</button>
+                        </div>
+                    </div>
+                    <div style="flex:1;min-width:280px;">
+                        <div id="aiVideoResult" style="min-height:200px;">
+                            <p style="color:var(--text-muted);text-align:center;padding:60px 0;font-size:0.85rem;">视频生成结果将显示在这里</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="aiVideoLocked" style="text-align:center;padding:40px 0;">
+                <p style="color:var(--text-dim);margin-bottom:12px;">请先完成 AI 生图步骤，或跳过此步骤</p>
+                <button class="secondary" id="aiVideoSkipBtn">跳过，直接上传视频</button>
+            </div>
+        </div>
+
+        <!-- 视频上传 -->
+        <div class="section" id="uploadSection">
+            <div class="section-header">
+                <div class="section-title">上传视频</div>
+                <button class="btn-back" id="backToAiVideo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    返回上一步
+                </button>
+            </div>
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-icon">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </div>
+                <div class="drop-zone-text">拖拽视频文件到此处，或 <span>点击上传</span></div>
+                <div class="drop-zone-hint">支持 MP4, WebM, MOV 等常见视频格式</div>
+            </div>
+            <input type="file" id="videoInput" accept="video/*">
+
+            <div style="margin-top:16px;display:flex;gap:8px;align-items:center;">
+                <input type="text" id="videoUrlInput" placeholder="或输入视频 URL 导入..." style="flex:1;">
+                <button class="secondary" id="importUrlBtn">导入</button>
+            </div>
+
+            <div class="video-info" id="videoInfo">
+                <div class="video-info-item">
+                    <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/></svg>
+                    <span id="videoName">-</span>
+                </div>
+                <div class="video-info-item">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span id="videoDuration">-</span>
+                </div>
+                <div class="video-info-item">
+                    <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    <span id="videoResolution">-</span>
+                </div>
+            </div>
+
+            <div class="video-preview" id="videoPreview">
+                <video id="video" controls></video>
+            </div>
+
+            <div class="controls" id="extractControls" style="display: none;">
+                <div class="control-group">
+                    <label>目标帧率 (fps):</label>
+                    <input type="number" id="fpsInput" value="12" min="1" max="60">
+                </div>
+                <button class="accent" id="extractBtn">开始拆帧</button>
+            </div>
+
+            <div class="hint">
+                提示：建议根据动画流畅度需求设置帧率。游戏序列帧通常 8-12 fps 即可，过高会增加文件大小。
+            </div>
+        </div>
+
+        <!-- 帧选择 -->
+        <div class="section" id="framesSection">
+            <div class="section-header">
+                <div class="section-title">选择帧</div>
+                <button class="btn-back" id="backToUpload">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    返回上一步
+                </button>
+            </div>
+            <div class="frames-toolbar">
+                <div class="frames-info">
+                    共 <span id="totalFrames">0</span> 帧，
+                    已选 <span id="selectedFrames">0</span> 帧
+                </div>
+                <div class="btn-group">
+                    <button class="secondary" id="selectAllBtn">全选</button>
+                    <button class="secondary" id="deselectAllBtn">全不选</button>
+                    <button class="secondary" id="invertSelectBtn">反选</button>
+                </div>
+            </div>
+            <div class="frames-grid" id="framesGrid"></div>
+            <div class="hint">
+                按住 Shift 点击可范围选择多帧
+            </div>
+            <div class="controls" style="margin-top: 20px;">
+                <button class="accent primary-action" id="toRemoveBgBtn" disabled>下一步：抠图</button>
+                <button class="success primary-action" id="toDirectSpriteBtn" disabled>直接合成精灵图</button>
+            </div>
+        </div>
+
+        <!-- 直接合成精灵图 -->
+        <div class="section" id="directSpriteSection">
+            <div class="section-header">
+                <div class="section-title">直接合成精灵图</div>
+                <button class="btn-back" id="backToFramesFromDirect">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    返回选择帧
+                </button>
+            </div>
+            <div class="hint" style="margin-bottom: 16px;">
+                跳过抠图步骤，将选中的帧直接合并为一张精灵图。适合无需透明背景的场景。
+            </div>
+            <div class="sprite-options">
+                <div class="control-group">
+                    <label>目标宽度</label>
+                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                        <button class="preset-btn" data-dw="64">64</button>
+                        <button class="preset-btn" data-dw="128">128</button>
+                        <button class="preset-btn" data-dw="256">256</button>
+                        <button class="preset-btn active" data-dw="512">512</button>
+                        <input type="number" id="directTargetWidth" value="512" min="64" max="2048" step="64" style="width:72px;">
+                        <label>px</label>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>目标高度</label>
+                    <div class="control-group">
+                        <input type="number" id="directTargetHeight" value="512" min="64" max="2048" readonly style="width:72px;background:var(--bg-primary);color:var(--text-dim);">
+                        <label>px</label>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>每行帧数</label>
+                    <input type="number" id="directColsInput" value="4" min="1" max="20">
+                </div>
+                <button class="accent" id="generateDirectSpriteBtn">生成精灵图</button>
+            </div>
+            <div class="sprite-preview" id="directSpritePreview" style="display: none;">
+                <canvas id="directSpriteCanvas"></canvas>
+                <div class="sprite-info" id="directSpriteInfo"></div>
+                <div class="export-bar">
+                    <button class="accent" id="downloadDirectSpriteBtn">下载 PNG</button>
+                    <button class="secondary" id="downloadDirectJsonBtn">下载 JSON</button>
+                    <div style="flex:1"></div>
+                    <div class="control-group">
+                        <label>GIF 帧率:</label>
+                        <input type="number" id="directGifFpsInput" value="12" min="1" max="60" style="width:64px;">
+                        <label>fps</label>
+                    </div>
+                    <button class="danger primary-action" id="downloadDirectGifBtn">导出 GIF</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 抠图 -->
+        <div class="section" id="removeBgSection">
+            <div class="section-header">
+                <div class="section-title">抠图</div>
+                <button class="btn-back" id="backToFramesFromBg">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    返回选择帧
+                </button>
+            </div>
+            <div style="margin-bottom:12px;display:flex;gap:8px;">
+                <button class="secondary" id="aiRemoveBgTabBtn" style="flex:1;padding:8px;">AI 抠图</button>
+                <button class="secondary" id="colorRemoveBgTabBtn" style="flex:1;padding:8px;border-color:var(--accent);color:var(--accent);">颜色抠图</button>
+            </div>
+
+            <!-- AI 抠图面板 -->
+            <div id="aiRemoveBgPanel" style="display:none;">
+                <div class="hint" style="margin-bottom: 16px;">
+                    AI 自动识别并去除背景，无需手动选色。处理时间取决于帧数和图片大小。
+                </div>
+                <div id="aiRemoveBgStatus" style="text-align:center;padding:30px 0;">
+                    <p style="color:var(--text-dim);margin-bottom:16px;">点击下方按钮，AI 将自动处理所有选中帧的背景</p>
+                    <button class="accent" id="aiRemoveBgStartBtn">开始 AI 抠图</button>
+                </div>
+                <div id="aiRemoveBgProgress" style="display:none;text-align:center;padding:20px 0;">
+                    <div class="progress-bar" style="max-width:300px;margin:0 auto 12px;">
+                        <div class="progress-fill" id="aiRemoveBgFill" style="width:0%"></div>
+                    </div>
+                    <p style="color:var(--text-dim);font-size:0.85rem;" id="aiRemoveBgProgressText">处理中... (0/0)</p>
+                    <button class="secondary" id="aiRemoveBgCancelBtn" style="margin-top:8px;">取消</button>
+                </div>
+            </div>
+
+            <!-- 颜色抠图面板 -->
+            <div id="colorRemoveBgPanel">
+                <div class="hint" style="margin-bottom: 16px;">
+                    在左侧图片上点击要抠除的背景颜色，调整容差后点击"批量处理"
+                </div>
+            <div class="color-picker-area">
+                <div class="picker-preview">
+                    <div class="picker-canvas-container" id="pickerContainer">
+                        <canvas id="pickerCanvas"></canvas>
+                        <div class="picker-cursor" id="pickerCursor">
+                            <div class="preview-color" id="pickerPreviewColor"></div>
+                            <div class="preview-hex" id="pickerPreviewHex"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="picker-controls">
+                    <div class="color-display">
+                        <div class="color-box" id="colorBox" style="background: #000;"></div>
+                        <div class="color-value" id="colorValue">#000000</div>
+                    </div>
+
+                    <div class="slider-group">
+                        <label>颜色容差 <span class="val" id="toleranceValue">30</span></label>
+                        <input type="range" id="toleranceSlider" min="0" max="100" value="30">
+                    </div>
+
+                    <div class="slider-group">
+                        <label>边缘羽化 <span class="val" id="featherValue">2</span></label>
+                        <input type="range" id="featherSlider" min="0" max="10" value="2">
+                    </div>
+
+                    <div class="picker-actions">
+                        <button id="previewRemoveBtn">预览效果</button>
+                        <button class="accent" id="batchRemoveBtn">批量处理</button>
+                    </div>
+                </div>
+            </div>
+            </div>
+            <div class="controls" style="margin-top: 20px;">
+                <button class="success primary-action" id="toSpriteBtn" disabled>下一步：合成精灵图</button>
+            </div>
+        </div>
+
+        <!-- 精灵图合成 -->
+        <div class="section" id="spriteSection">
+            <div class="section-header">
+                <div class="section-title">合成精灵图</div>
+                <button class="btn-back" id="backToBgFromSprite">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    返回抠图
+                </button>
+            </div>
+            <div class="sprite-options">
+                <div class="control-group">
+                    <label>目标宽度</label>
+                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                        <button class="preset-btn" data-w="64">64</button>
+                        <button class="preset-btn" data-w="128">128</button>
+                        <button class="preset-btn" data-w="256">256</button>
+                        <button class="preset-btn active" data-w="512">512</button>
+                        <input type="number" id="targetWidth" value="512" min="64" max="2048" step="64" style="width:72px;">
+                        <label>px</label>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>目标高度</label>
+                    <div class="control-group">
+                        <input type="number" id="targetHeight" value="512" min="64" max="2048" readonly style="width:72px;background:var(--bg-primary);color:var(--text-dim);">
+                        <label>px</label>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>每行帧数</label>
+                    <input type="number" id="colsInput" value="4" min="1" max="20">
+                </div>
+                <div class="pixel-art-row">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="pixelArtEnabled">
+                        <span style="color:var(--text-dim);">像素画风格</span>
+                    </label>
+                    <div class="control-group" id="pixelArtControls" style="opacity:0.4;pointer-events:none;">
+                        <label>像素尺寸</label>
+                        <input type="number" id="pixelSizeInput" value="4" min="2" max="16" style="width:56px;" disabled>
+                        <label style="margin-left:8px;">色阶</label>
+                        <input type="number" id="colorLevelsInput" value="4" min="2" max="32" style="width:56px;" disabled>
+                        <label style="margin-left:8px;" class="toggle-label">
+                            <input type="checkbox" id="pixelOutlineEnabled" disabled>
+                            <span style="color:var(--text-dim);">描边</span>
+                        </label>
+                    </div>
+                </div>
+                <button class="accent" id="generateSpriteBtn">生成精灵图</button>
+            </div>
+
+            <div class="sprite-preview" id="spritePreview" style="display: none;">
+                <canvas id="spriteCanvas"></canvas>
+                <div class="sprite-info" id="spriteInfo"></div>
+                <div class="export-bar">
+                    <button class="accent" id="downloadSpriteBtn">下载 PNG</button>
+                    <button class="secondary" id="downloadJsonBtn">下载 JSON</button>
+                    <div style="flex:1"></div>
+                    <div class="control-group">
+                        <label>GIF 帧率:</label>
+                        <input type="number" id="gifFpsInput" value="12" min="1" max="60" style="width:64px;">
+                        <label>fps</label>
+                    </div>
+                    <button class="danger primary-action" id="downloadGifBtn">导出 GIF</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 进度遮罩 -->
+    <div class="progress-overlay" id="progressOverlay">
+        <div class="progress-box">
+            <div class="progress-text" id="progressText">正在处理...</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-percent" id="progressPercent">0%</div>
+        </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <h3>即梦 AI 设置</h3>
+            <p>输入即梦 AI 的 sessionid 以启用 AI 生图和生视频功能。</p>
+            <p style="color:var(--text-muted);font-size:0.8rem;">获取方式：访问 <a href="https://jimeng.jianying.com" target="_blank" style="color:var(--accent)">jimeng.jianying.com</a> -> 登录 -> F12 -> Application -> Cookies -> 复制 sessionid 的值</p>
+            <input type="text" id="sessionIdInput" placeholder="粘贴 sessionid...">
+            <div class="btn-row">
+                <button class="secondary" id="settingsCancelBtn">取消</button>
+                <button class="accent" id="settingsSaveBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ── 全局状态（必须在所有函数/事件之前声明，避免 TDZ 错误）──
+        const state = {
+            video: null,
+            frames: [],
+            processedFrames: [],
+            selectedColor: null,
+            tolerance: 30,
+            feather: 2,
+            lastClickedFrameIndex: -1,
+            sessionid: localStorage.getItem('jimeng_sessionid') || '',
+            generatedImages: [],
+            selectedImage: null,
+            generatedVideo: null
+        };
+
+        // ── Toast 通知系统 ──
+        function showToast(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const icons = {
+                info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+                success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+                warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+                error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+            };
+            toast.innerHTML = (icons[type] || icons.info) + `<span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('out');
+                toast.addEventListener('animationend', () => toast.remove());
+            }, duration);
+        }
+
+        // ── 步骤条更新 ──
+        function updateSteps(currentStep) {
+            document.querySelectorAll('.step').forEach(el => {
+                const s = parseInt(el.dataset.step);
+                el.classList.toggle('active', s === currentStep);
+                el.classList.toggle('done', s < currentStep);
+            });
+            document.querySelectorAll('.step-line').forEach((el, i) => {
+                el.classList.toggle('done', i < currentStep - 1);
+            });
+        }
+
+        function showSection(section) {
+            section.style.display = 'block';
+            requestAnimationFrame(() => {
+                section.classList.add('visible');
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
+
+        function hideSection(section) {
+            section.classList.remove('visible');
+            section.style.display = 'none';
+        }
+
+        // ── 即梦 AI 工具函数 ──
+        function updateSessionStatus() {
+            const dot = document.getElementById('sessionDot');
+            const locked1 = document.getElementById('aiImageLocked');
+            const content1 = document.getElementById('aiImageContent');
+            if (dot) dot.classList.toggle('active', !!state.sessionid);
+            if (locked1 && content1) {
+                locked1.style.display = state.sessionid ? 'none' : 'block';
+                content1.style.display = state.sessionid ? 'block' : 'none';
+            }
+        }
+
+        async function fetchJimengAPI(apiPath, options = {}) {
+            if (!state.sessionid) {
+                showToast('请先在设置中输入即梦 sessionid', 'warning');
+                document.getElementById('settingsBtn').click();
+                throw new Error('未设置 sessionid');
+            }
+            const resp = await fetch('/api/jimeng/' + apiPath, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Session-Id': state.sessionid,
+                    ...(options.headers || {})
+                }
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
+                if (err.error && err.error.includes('session')) {
+                    showToast('sessionid 可能已失效，请重新设置', 'error');
+                }
+                throw new Error(err.error || `API 错误: ${resp.status}`);
+            }
+            return resp.json();
+        }
+
+        // ── 设置弹窗 ──
+        document.getElementById('settingsBtn').addEventListener('click', () => {
+            document.getElementById('sessionIdInput').value = state.sessionid;
+            document.getElementById('settingsModal').classList.add('visible');
+        });
+
+        // ── AI 服务状态监控 ──
+        const serviceStatusDot = document.getElementById('serviceStatusDot');
+        const serviceStatusText = document.getElementById('serviceStatusText');
+        const serviceStatusEl = document.getElementById('serviceStatus');
+
+        const STATUS_CONFIG = {
+            running:  { color: '#22c55e', text: 'AI 服务运行中' },
+            starting: { color: '#eab308', text: 'AI 服务启动中...' },
+            stopped:  { color: '#888',    text: 'AI 服务未运行' },
+            error:    { color: '#ef4444', text: 'AI 服务异常' },
+        };
+
+        async function refreshServiceStatus() {
+            try {
+                const resp = await fetch('/api/health');
+                const data = await resp.json();
+                const cfg = STATUS_CONFIG[data.status] || STATUS_CONFIG.error;
+                serviceStatusDot.style.background = cfg.color;
+                serviceStatusText.textContent = cfg.text;
+                serviceStatusEl.title = data.message || cfg.text;
+                return data.status;
+            } catch {
+                serviceStatusDot.style.background = '#ef4444';
+                serviceStatusText.textContent = '后端不可达';
+                return 'error';
+            }
+        }
+
+        async function callServiceAction(action) {
+            const btn = serviceStatusEl;
+            const oldText = serviceStatusText.textContent;
+            serviceStatusText.textContent = action === 'restart' ? '重启中...' : (action === 'start' ? '启动中...' : '停止中...');
+            try {
+                const resp = await fetch('/api/jimeng-service/' + action, { method: 'POST' });
+                const data = await resp.json();
+                showToast(data.message || (data.ok ? '操作成功' : '操作失败'), data.ok ? 'success' : 'error');
+            } catch (err) {
+                showToast('操作失败: ' + err.message, 'error');
+                serviceStatusText.textContent = oldText;
+            }
+            await refreshServiceStatus();
+        }
+
+        serviceStatusEl.addEventListener('click', async () => {
+            const status = await refreshServiceStatus();
+            if (serviceStatusText.textContent === '后端不可达') {
+                showToast('未通过 node server.js 启动，AI 功能不可用。请在终端运行：node server.js', 'warning', 6000);
+                return;
+            }
+            const actions = {
+                running:  { label: '重启 AI 服务', action: 'restart' },
+                starting: { label: '强制重启',     action: 'restart' },
+                stopped:  { label: '启动 AI 服务', action: 'start' },
+                error:    { label: '重启 AI 服务', action: 'restart' },
+            };
+            const opt = actions[status] || actions.error;
+            if (confirm(`当前状态：${STATUS_CONFIG[status]?.text || status}\n\n是否${opt.label}？`)) {
+                callServiceAction(opt.action);
+            }
+        });
+
+        refreshServiceStatus();
+        setInterval(refreshServiceStatus, 10000);
+        document.getElementById('settingsCancelBtn').addEventListener('click', () => {
+            document.getElementById('settingsModal').classList.remove('visible');
+        });
+        document.getElementById('settingsSaveBtn').addEventListener('click', () => {
+            const val = document.getElementById('sessionIdInput').value.trim();
+            state.sessionid = val;
+            localStorage.setItem('jimeng_sessionid', val);
+            document.getElementById('settingsModal').classList.remove('visible');
+            updateSessionStatus();
+            showToast(val ? 'sessionid 已保存' : 'sessionid 已清除', 'success');
+        });
+
+        // ── AI 步骤跳过按钮 ──
+        document.getElementById('aiImageSkipBtn').addEventListener('click', () => {
+            hideSection(aiImageSection);
+            showSection(uploadSection);
+            updateSteps(3);
+        });
+        document.getElementById('aiVideoSkipBtn').addEventListener('click', () => {
+            hideSection(aiVideoSection);
+            showSection(uploadSection);
+            updateSteps(3);
+        });
+        document.getElementById('backToAiVideo').addEventListener('click', () => {
+            hideSection(uploadSection);
+            showSection(aiVideoSection);
+            updateSteps(2);
+        });
+        document.getElementById('backToAiImage').addEventListener('click', () => {
+            hideSection(aiVideoSection);
+            showSection(aiImageSection);
+            updateSteps(1);
+        });
+
+        // ── 初始化 ──
+        updateSessionStatus();
+
+        // ── AI 生图逻辑 ──
+        const aiPromptInput = document.getElementById('aiPromptInput');
+        const aiGenerateBtn = document.getElementById('aiGenerateBtn');
+        const aiRefImageToggle = document.getElementById('aiRefImageToggle');
+        const aiRefImageArea = document.getElementById('aiRefImageArea');
+        const aiRefDropZone = document.getElementById('aiRefDropZone');
+        const aiRefFileInput = document.getElementById('aiRefFileInput');
+        const aiRefPreview = document.getElementById('aiRefPreview');
+        const aiRefPreviewImg = document.getElementById('aiRefPreviewImg');
+        const aiRefClearBtn = document.getElementById('aiRefClearBtn');
+        const aiAdvancedToggle = document.getElementById('aiAdvancedToggle');
+        const aiAdvancedParams = document.getElementById('aiAdvancedParams');
+        const aiImageResults = document.getElementById('aiImageResults');
+        const aiImageActions = document.getElementById('aiImageActions');
+        const aiToVideoBtn = document.getElementById('aiToVideoBtn');
+        let aiRefImageData = null;
+
+        aiRefImageToggle.addEventListener('change', () => {
+            aiRefImageArea.style.display = aiRefImageToggle.checked ? 'block' : 'none';
+            if (!aiRefImageToggle.checked) { aiRefImageData = null; aiRefPreview.style.display = 'none'; }
+        });
+
+        aiAdvancedToggle.addEventListener('click', () => {
+            const open = aiAdvancedParams.style.display === 'none';
+            aiAdvancedParams.style.display = open ? 'block' : 'none';
+            aiAdvancedToggle.textContent = open ? '高级参数 ▾' : '高级参数 ▸';
+        });
+
+        document.getElementById('aiStrengthSlider').addEventListener('input', e => {
+            document.getElementById('aiStrengthValue').textContent = (e.target.value / 100).toFixed(1);
+        });
+
+        aiRefDropZone.addEventListener('click', () => aiRefFileInput.click());
+        aiRefDropZone.addEventListener('dragover', e => { e.preventDefault(); aiRefDropZone.classList.add('dragover'); });
+        aiRefDropZone.addEventListener('dragleave', () => aiRefDropZone.classList.remove('dragover'));
+        aiRefDropZone.addEventListener('drop', e => {
+            e.preventDefault(); aiRefDropZone.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) loadAiRefImage(e.dataTransfer.files[0]);
+        });
+        aiRefFileInput.addEventListener('change', () => { if (aiRefFileInput.files[0]) loadAiRefImage(aiRefFileInput.files[0]); });
+        aiRefClearBtn.addEventListener('click', () => { aiRefImageData = null; aiRefPreview.style.display = 'none'; });
+
+        function loadAiRefImage(file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                aiRefImageData = e.target.result;
+                aiRefPreviewImg.src = aiRefImageData;
+                aiRefPreview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function handleAiGenerate() {
+            const prompt = aiPromptInput.value.trim();
+            if (!prompt) { showToast('请输入图片描述', 'warning'); return; }
+
+            aiGenerateBtn.disabled = true;
+            aiGenerateBtn.textContent = '生成中...';
+            aiImageResults.innerHTML = '<div class="ai-loading"><div class="spinner"></div>AI 正在生成图片，请稍候...</div>';
+            aiImageActions.style.display = 'none';
+            state.generatedImages = [];
+            state.selectedImage = null;
+
+            try {
+                const body = {
+                    model: document.getElementById('aiModelSelect').value,
+                    prompt,
+                    ratio: document.getElementById('aiRatioSelect').value,
+                    resolution: '2k',
+                    sample_strength: document.getElementById('aiStrengthSlider').value / 100,
+                    response_format: 'url'
+                };
+                if (aiRefImageData && aiRefImageToggle.checked) {
+                    body.images = [aiRefImageData];
+                }
+                const data = await fetchJimengAPI('images/generations', {
+                    method: 'POST',
+                    body: JSON.stringify(body)
+                });
+
+                const images = (data.data || []).filter(d => d.url);
+                if (images.length === 0) throw new Error('未生成图片');
+
+                state.generatedImages = images.map((img, i) => ({ id: i, url: img.url, selected: false }));
+                renderAiResults();
+                showToast(`已生成 ${images.length} 张图片`, 'success');
+            } catch (err) {
+                aiImageResults.innerHTML = `<p style="color:var(--danger);text-align:center;padding:20px;">生成失败: ${err.message}</p>`;
+                showToast('图片生成失败: ' + err.message, 'error');
+            } finally {
+                aiGenerateBtn.disabled = false;
+                aiGenerateBtn.textContent = '生成图片';
+            }
+        }
+
+        function renderAiResults() {
+            if (state.generatedImages.length === 0) {
+                aiImageResults.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:60px 0;font-size:0.85rem;">生成结果将显示在这里</p>';
+                aiImageActions.style.display = 'none';
+                return;
+            }
+            aiImageResults.innerHTML = '<div class="ai-results-grid">' +
+                state.generatedImages.map(img =>
+                    `<div class="ai-result-item${img.selected ? ' selected' : ''}" data-ai-id="${img.id}">
+                        <img src="${img.url}" loading="lazy">
+                        <div class="ai-result-check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg></div>
+                        <div class="ai-result-actions">
+                            <button class="secondary" onclick="downloadAiImage('${img.url}', ${img.id})" style="padding:3px 6px;font-size:0.7rem;">下载</button>
+                        </div>
+                    </div>`
+                ).join('') + '</div>';
+
+            aiImageActions.style.display = 'flex';
+
+            aiImageResults.querySelectorAll('.ai-result-item').forEach(el => {
+                el.addEventListener('click', e => {
+                    if (e.target.closest('.ai-result-actions')) return;
+                    const id = parseInt(el.dataset.aiId);
+                    const img = state.generatedImages.find(i => i.id === id);
+                    if (img) {
+                        img.selected = !img.selected;
+                        el.classList.toggle('selected', img.selected);
+                        state.selectedImage = state.generatedImages.find(i => i.selected) || null;
+                        aiToVideoBtn.disabled = !state.selectedImage;
+                    }
+                });
+            });
+        }
+
+        function downloadAiImage(url, id) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ai-generated-${id + 1}.png`;
+            a.target = '_blank';
+            a.click();
+        }
+
+        aiGenerateBtn.addEventListener('click', handleAiGenerate);
+
+        // 跳过按钮 (AI生图区域的额外跳过按钮)
+        document.getElementById('aiImageSkipBtn2').addEventListener('click', () => {
+            hideSection(aiImageSection);
+            showSection(uploadSection);
+            updateSteps(3);
+        });
+        document.getElementById('aiImageSkipBtn3').addEventListener('click', () => {
+            hideSection(aiImageSection);
+            showSection(uploadSection);
+            updateSteps(3);
+        });
+
+        // 选中图片后 -> 进入AI生视频步骤
+        aiToVideoBtn.addEventListener('click', () => {
+            if (!state.selectedImage) { showToast('请先选择一张图片', 'warning'); return; }
+            hideSection(aiImageSection);
+            showSection(aiVideoSection);
+            updateSteps(2);
+            onFirstFrameReady(state.selectedImage);
+        });
+
+        // ── AI 生视频逻辑 ──
+        const aiVideoPrompt = document.getElementById('aiVideoPrompt');
+        const aiVideoGenerateBtn = document.getElementById('aiVideoGenerateBtn');
+        const aiVideoResult = document.getElementById('aiVideoResult');
+        const aiVideoFirstFrame = document.getElementById('aiVideoFirstFrame');
+        const aiVideoFirstFrameFile = document.getElementById('aiVideoFirstFrameFile');
+        const aiVideoFirstFrameUpload = document.getElementById('aiVideoFirstFrameUpload');
+        const aiVideoLastFrameDrop = document.getElementById('aiVideoLastFrameDrop');
+        const aiVideoLastFrameFile = document.getElementById('aiVideoLastFrameFile');
+        const aiVideoLastFramePreview = document.getElementById('aiVideoLastFramePreview');
+        const aiVideoLastFrameImg = document.getElementById('aiVideoLastFrameImg');
+        const aiVideoAdvancedToggle = document.getElementById('aiVideoAdvancedToggle');
+        const aiVideoAdvancedParams = document.getElementById('aiVideoAdvancedParams');
+        let aiVideoFirstFrameUrl = null;
+        let aiVideoLastFrameUrl = null;
+
+        // 首帧来自AI生图
+        function onFirstFrameReady(imgData) {
+            aiVideoFirstFrameUrl = imgData.url;
+            aiVideoFirstFrame.innerHTML = `<img src="${imgData.url}" style="max-width:100%;max-height:200px;border-radius:8px;">`;
+            document.getElementById('aiVideoContent').style.display = 'block';
+            document.getElementById('aiVideoLocked').style.display = 'none';
+        }
+
+        aiVideoFirstFrameUpload.addEventListener('click', () => aiVideoFirstFrameFile.click());
+        aiVideoFirstFrameFile.addEventListener('change', () => {
+            const file = aiVideoFirstFrameFile.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                aiVideoFirstFrameUrl = e.target.result;
+                aiVideoFirstFrame.innerHTML = `<img src="${e.target.result}" style="max-width:100%;max-height:200px;border-radius:8px;">`;
+                document.getElementById('aiVideoContent').style.display = 'block';
+                document.getElementById('aiVideoLocked').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        aiVideoLastFrameDrop.addEventListener('click', () => aiVideoLastFrameFile.click());
+        aiVideoLastFrameDrop.addEventListener('dragover', e => { e.preventDefault(); aiVideoLastFrameDrop.classList.add('dragover'); });
+        aiVideoLastFrameDrop.addEventListener('dragleave', () => aiVideoLastFrameDrop.classList.remove('dragover'));
+        aiVideoLastFrameDrop.addEventListener('drop', e => {
+            e.preventDefault(); aiVideoLastFrameDrop.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) loadAiVideoLastFrame(e.dataTransfer.files[0]);
+        });
+        aiVideoLastFrameFile.addEventListener('change', () => { if (aiVideoLastFrameFile.files[0]) loadAiVideoLastFrame(aiVideoLastFrameFile.files[0]); });
+
+        function loadAiVideoLastFrame(file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                aiVideoLastFrameUrl = e.target.result;
+                aiVideoLastFrameImg.src = e.target.result;
+                aiVideoLastFramePreview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        document.getElementById('aiVideoLastFrameClear').addEventListener('click', () => {
+            aiVideoLastFrameUrl = null;
+            aiVideoLastFramePreview.style.display = 'none';
+        });
+
+        aiVideoAdvancedToggle.addEventListener('click', () => {
+            const open = aiVideoAdvancedParams.style.display === 'none';
+            aiVideoAdvancedParams.style.display = open ? 'block' : 'none';
+            aiVideoAdvancedToggle.textContent = open ? '高级参数 ▾' : '高级参数 ▸';
+        });
+
+        async function handleAiVideoGenerate() {
+            if (!aiVideoFirstFrameUrl) { showToast('请先设置首帧图片', 'warning'); return; }
+            const prompt = aiVideoPrompt.value.trim() || '缓慢动画';
+
+            aiVideoGenerateBtn.disabled = true;
+            aiVideoGenerateBtn.textContent = '生成中...';
+            aiVideoResult.innerHTML = '<div class="ai-loading"><div class="spinner"></div>AI 正在生成视频，这可能需要几分钟...</div>';
+
+            try {
+                const filePaths = [aiVideoFirstFrameUrl];
+                if (aiVideoLastFrameUrl) filePaths.push(aiVideoLastFrameUrl);
+
+                const body = {
+                    model: document.getElementById('aiVideoModelSelect').value,
+                    prompt,
+                    file_paths: filePaths,
+                    duration: parseInt(document.getElementById('aiVideoDurationSelect').value),
+                    ratio: document.getElementById('aiVideoRatioSelect').value,
+                    resolution: '720p'
+                };
+
+                // 提交异步任务
+                const submitData = await fetchJimengAPI('videos/generations/async', {
+                    method: 'POST',
+                    body: JSON.stringify(body)
+                });
+
+                const taskId = submitData.task_id;
+                if (!taskId) throw new Error('未获取到任务 ID');
+
+                // 轮询任务状态
+                aiVideoPollAbort = { cancelled: false };
+                aiVideoResult.innerHTML = '<div class="ai-loading"><div class="spinner"></div>视频生成中，等待排队... (task: ' + taskId.substring(0, 8) + ')<br><button class="secondary" id="aiVideoCancelBtn" style="margin-top:12px;">取消</button></div>';
+                const cancelBtn = document.getElementById('aiVideoCancelBtn');
+                if (cancelBtn) cancelBtn.addEventListener('click', () => { aiVideoPollAbort.cancelled = true; });
+
+                const result = await pollAiVideoTask(taskId, 120, aiVideoPollAbort);
+                state.generatedVideo = result.url;
+                renderAiVideoResult(result);
+                showToast('视频生成完成', 'success');
+            } catch (err) {
+                aiVideoResult.innerHTML = `<p style="color:var(--danger);text-align:center;padding:20px;">生成失败: ${err.message}</p>`;
+                showToast('视频生成失败: ' + err.message, 'error');
+            } finally {
+                aiVideoPollAbort = null;
+                aiVideoGenerateBtn.disabled = false;
+                aiVideoGenerateBtn.textContent = '生成视频';
+            }
+        }
+
+        let aiVideoPollAbort = null;
+
+        async function pollAiVideoTask(taskId, maxPolls = 120, abort = null) {
+            for (let i = 0; i < maxPolls; i++) {
+                await new Promise(r => setTimeout(r, 5000));
+                if (abort && abort.cancelled) throw new Error('已取消');
+                try {
+                    const data = await fetchJimengAPI('videos/generations/async/' + taskId);
+                    if (data.status === 'succeeded' && data.data && data.data[0]) {
+                        return data.data[0];
+                    }
+                    if (data.status === 'failed') {
+                        throw new Error(data.error || '视频生成失败');
+                    }
+                    if (i % 6 === 0) {
+                        const elapsed = Math.round((i + 1) * 5);
+                        const loading = aiVideoResult.querySelector('.ai-loading');
+                        if (loading) {
+                            const btn = loading.querySelector('#aiVideoCancelBtn');
+                            loading.innerHTML = `<div class="spinner"></div>视频生成中... 已等待 ${elapsed}s<br>`;
+                            if (btn) loading.appendChild(btn);
+                        }
+                    }
+                } catch (err) {
+                    if (err.message.includes('生成失败') || err.message === '已取消') throw err;
+                }
+            }
+            throw new Error('视频生成超时');
+        }
+
+        function renderAiVideoResult(result) {
+            aiVideoResult.innerHTML = `
+                <div style="text-align:center;">
+                    <video controls autoplay loop style="max-width:100%;max-height:360px;border-radius:8px;border:1px solid var(--border);" src="${result.url}"></video>
+                    <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+                        <button class="accent" id="aiVideoDownloadBtn" style="padding:8px 18px;border-radius:8px;font-size:0.88rem;">下载视频</button>
+                        <button class="success" id="aiVideoUseBtn">使用此视频进行拆帧</button>
+                    </div>
+                </div>`;
+            document.getElementById('aiVideoDownloadBtn').addEventListener('click', () => downloadVideoViaProxy(result.url));
+            document.getElementById('aiVideoUseBtn').addEventListener('click', () => useAiGeneratedVideo(result.url));
+        }
+
+        async function downloadVideoViaProxy(videoUrl) {
+            showToast('正在下载视频...', 'info');
+            try {
+                const proxyUrl = '/api/jimeng/video-download?url=' + encodeURIComponent(videoUrl);
+                const resp = await fetch(proxyUrl);
+                if (!resp.ok) throw new Error('下载失败 (' + resp.status + ')');
+                const blob = await resp.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = 'ai-generated-video.mp4';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+                showToast('视频下载完成', 'success');
+            } catch (err) {
+                showToast('视频下载失败: ' + err.message, 'error');
+            }
+        }
+
+        async function useAiGeneratedVideo(videoUrl) {
+            showToast('正在加载视频...', 'info');
+            try {
+                const proxyUrl = '/api/jimeng/video-download?url=' + encodeURIComponent(videoUrl);
+                const resp = await fetch(proxyUrl);
+                if (!resp.ok) throw new Error('视频下载失败 (' + resp.status + ')');
+                const blob = await resp.blob();
+                const blobUrl = URL.createObjectURL(blob);
+
+                video.src = blobUrl;
+                video.onloadeddata = () => {
+                    state.video = video;
+                    showVideoInfo({ name: 'AI 生成视频' }, video.duration);
+                    videoPreview.style.display = 'block';
+                    extractControls.style.display = 'flex';
+                    hideSection(aiVideoSection);
+                    showSection(uploadSection);
+                    updateSteps(3);
+                    const suggestedFps = video.duration > 10 ? 8 : video.duration > 5 ? 10 : 12;
+                    fpsInput.value = suggestedFps;
+                    showToast('视频已导入，可以开始拆帧', 'success');
+                };
+                video.onerror = () => showToast('视频加载失败', 'error');
+            } catch (err) {
+                showToast('视频加载失败: ' + err.message, 'error');
+            }
+        }
+
+        aiVideoGenerateBtn.addEventListener('click', handleAiVideoGenerate);
+
+        document.getElementById('aiVideoSkipBtn2').addEventListener('click', () => {
+            hideSection(aiVideoSection);
+            showSection(uploadSection);
+            updateSteps(3);
+        });
+
+        // ── AI 抠图逻辑 ──
+        const aiRemoveBgTabBtn = document.getElementById('aiRemoveBgTabBtn');
+        const colorRemoveBgTabBtn = document.getElementById('colorRemoveBgTabBtn');
+        const aiRemoveBgPanel = document.getElementById('aiRemoveBgPanel');
+        const colorRemoveBgPanel = document.getElementById('colorRemoveBgPanel');
+        const aiRemoveBgStartBtn = document.getElementById('aiRemoveBgStartBtn');
+        let aiRemoveBgLib = null;
+
+        aiRemoveBgTabBtn.addEventListener('click', () => {
+            aiRemoveBgPanel.style.display = 'block';
+            colorRemoveBgPanel.style.display = 'none';
+            aiRemoveBgTabBtn.style.borderColor = 'var(--accent)';
+            aiRemoveBgTabBtn.style.color = 'var(--accent)';
+            colorRemoveBgTabBtn.style.borderColor = '';
+            colorRemoveBgTabBtn.style.color = '';
+        });
+        colorRemoveBgTabBtn.addEventListener('click', () => {
+            aiRemoveBgPanel.style.display = 'none';
+            colorRemoveBgPanel.style.display = 'block';
+            colorRemoveBgTabBtn.style.borderColor = 'var(--accent)';
+            colorRemoveBgTabBtn.style.color = 'var(--accent)';
+            aiRemoveBgTabBtn.style.borderColor = '';
+            aiRemoveBgTabBtn.style.color = '';
+        });
+
+        const AI_REMOVE_BG_CDNS = [
+            'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.8/+esm',
+            'https://unpkg.com/@imgly/background-removal@1.5.8/dist/index.mjs',
+        ];
+
+        async function loadAiRemoveBgLib() {
+            if (aiRemoveBgLib) return aiRemoveBgLib;
+
+            let lastError = null;
+            for (const cdnUrl of AI_REMOVE_BG_CDNS) {
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    try {
+                        const cdnName = new URL(cdnUrl).hostname;
+                        showToast(`正在加载 AI 抠图模型${attempt > 1 ? ` (重试 ${attempt}/3)` : ''} [${cdnName}]...`, 'info', 8000);
+                        const module = await Promise.race([
+                            import(cdnUrl),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('加载超时')), 60000)),
+                        ]);
+                        aiRemoveBgLib = module;
+                        return module;
+                    } catch (err) {
+                        lastError = err;
+                        if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 2000));
+                    }
+                }
+            }
+
+            aiRemoveBgLib = null;
+            throw lastError || new Error('所有 CDN 源均加载失败');
+        }
+
+        let aiRemoveBgCancelled = false;
+        const aiRemoveBgCancelBtn = document.getElementById('aiRemoveBgCancelBtn');
+        if (aiRemoveBgCancelBtn) {
+            aiRemoveBgCancelBtn.addEventListener('click', () => { aiRemoveBgCancelled = true; });
+        }
+
+        aiRemoveBgStartBtn.addEventListener('click', async () => {
+            const selectedFrames = state.frames.filter(f => f.selected);
+            if (selectedFrames.length === 0) { showToast('请先选择至少一帧', 'warning'); return; }
+
+            aiRemoveBgCancelled = false;
+            aiRemoveBgStartBtn.disabled = true;
+            aiRemoveBgStartBtn.textContent = '加载 AI 模型中...';
+            document.getElementById('aiRemoveBgStatus').style.display = 'none';
+            const progressArea = document.getElementById('aiRemoveBgProgress');
+            const progressFill = document.getElementById('aiRemoveBgFill');
+            const progressText = document.getElementById('aiRemoveBgProgressText');
+            progressArea.style.display = 'block';
+
+            try {
+                const lib = await loadAiRemoveBgLib();
+                state.processedFrames = [];
+                const total = selectedFrames.length;
+
+                for (let i = 0; i < total; i++) {
+                    if (aiRemoveBgCancelled) throw new Error('已取消');
+                    progressText.textContent = `处理中... (${i + 1}/${total})`;
+                    progressFill.style.width = `${((i + 1) / total) * 100}%`;
+
+                    const frame = selectedFrames[i];
+                    const resp = await fetch(frame.dataUrl);
+                    const blob = await resp.blob();
+
+                    const resultBlob = await lib.removeBackground(blob, {
+                        progress: (key, current, total) => {}
+                    });
+
+                    const url = URL.createObjectURL(resultBlob);
+                    const img = await new Promise((resolve, reject) => {
+                        const im = new Image();
+                        im.onload = () => resolve(im);
+                        im.onerror = reject;
+                        im.src = url;
+                    });
+                    state.processedFrames.push({ id: frame.id, dataUrl: url, _w: img.width, _h: img.height });
+
+                    if (i === 0) {
+                        pickerCanvas.width = img.width;
+                        pickerCanvas.height = img.height;
+                        pickerCtx.drawImage(img, 0, 0);
+                    }
+                }
+
+                toSpriteBtn.disabled = false;
+                progressText.textContent = `完成！已处理 ${total} 帧`;
+                showToast(`AI 抠图完成，共处理 ${total} 帧`, 'success');
+
+                setTimeout(() => {
+                    progressArea.style.display = 'none';
+                    document.getElementById('aiRemoveBgStatus').style.display = 'block';
+                    aiRemoveBgStartBtn.textContent = '重新 AI 抠图';
+                    aiRemoveBgStartBtn.disabled = false;
+                }, 1500);
+            } catch (err) {
+                let userMsg;
+                const msg = (err.message || '').toLowerCase();
+                if (err.message === '已取消') {
+                    userMsg = 'AI 抠图已取消';
+                } else if (msg.includes('fetch') || msg.includes('network') || msg.includes('cdn') || msg.includes('net::')) {
+                    userMsg = 'AI 抠图失败: 网络连接异常，请检查网络后重试。也可以切换到「颜色抠图」标签手动处理';
+                } else if (msg.includes('超时') || msg.includes('timeout') || msg.includes('timed out')) {
+                    userMsg = 'AI 抠图失败: 模型加载超时，请检查网络速度。也可以切换到「颜色抠图」标签手动处理';
+                } else {
+                    userMsg = 'AI 抠图失败: ' + err.message + '。可以切换到「颜色抠图」标签手动处理';
+                }
+                showToast(userMsg, err.message === '已取消' ? 'warning' : 'error', 8000);
+                progressArea.style.display = 'none';
+                document.getElementById('aiRemoveBgStatus').style.display = 'block';
+                aiRemoveBgStartBtn.disabled = false;
+                aiRemoveBgStartBtn.textContent = '重试 AI 抠图';
+            }
+        });
+
+        // ── DOM 元素 ──
+        const dropZone = document.getElementById('dropZone');
+        const videoInput = document.getElementById('videoInput');
+        const videoPreview = document.getElementById('videoPreview');
+        const video = document.getElementById('video');
+        const extractControls = document.getElementById('extractControls');
+        const fpsInput = document.getElementById('fpsInput');
+        const extractBtn = document.getElementById('extractBtn');
+        const framesSection = document.getElementById('framesSection');
+        const aiImageSection = document.getElementById('aiImageSection');
+        const aiVideoSection = document.getElementById('aiVideoSection');
+        const uploadSection = document.getElementById('uploadSection');
+        const framesGrid = document.getElementById('framesGrid');
+        const totalFramesEl = document.getElementById('totalFrames');
+        const selectedFramesEl = document.getElementById('selectedFrames');
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        const deselectAllBtn = document.getElementById('deselectAllBtn');
+        const invertSelectBtn = document.getElementById('invertSelectBtn');
+        const toRemoveBgBtn = document.getElementById('toRemoveBgBtn');
+        const removeBgSection = document.getElementById('removeBgSection');
+        const pickerCanvas = document.getElementById('pickerCanvas');
+        const pickerCtx = pickerCanvas.getContext('2d');
+        const pickerContainer = document.getElementById('pickerContainer');
+        const pickerCursor = document.getElementById('pickerCursor');
+        const pickerPreviewColor = document.getElementById('pickerPreviewColor');
+        const pickerPreviewHex = document.getElementById('pickerPreviewHex');
+        const colorBox = document.getElementById('colorBox');
+        const colorValue = document.getElementById('colorValue');
+        const toleranceSlider = document.getElementById('toleranceSlider');
+        const toleranceValue = document.getElementById('toleranceValue');
+        const featherSlider = document.getElementById('featherSlider');
+        const featherValue = document.getElementById('featherValue');
+        const previewRemoveBtn = document.getElementById('previewRemoveBtn');
+        const batchRemoveBtn = document.getElementById('batchRemoveBtn');
+        const toSpriteBtn = document.getElementById('toSpriteBtn');
+        const spriteSection = document.getElementById('spriteSection');
+        const targetWidth = document.getElementById('targetWidth');
+        const targetHeight = document.getElementById('targetHeight');
+
+        // ── 视频信息显示 ──
+        function showVideoInfo(file, dur) {
+            const infoEl = document.getElementById('videoInfo');
+            const nameEl = document.getElementById('videoName');
+            const durEl = document.getElementById('videoDuration');
+            const resEl = document.getElementById('videoResolution');
+            if (file) nameEl.textContent = file.name || 'URL 视频';
+            const m = Math.floor(dur / 60);
+            const s = Math.floor(dur % 60);
+            durEl.textContent = m > 0 ? `${m}分${s}秒` : `${s}秒`;
+            resEl.textContent = `${video.videoWidth} x ${video.videoHeight}`;
+            infoEl.classList.add('visible');
+        }
+
+        // 根据第一帧宽高比自动计算目标高度
+        function autoHeight() {
+            const w = parseInt(targetWidth.value) || 512;
+            const frames = state.processedFrames.length > 0 ? state.processedFrames : state.frames;
+            if (frames.length > 0) {
+                const img = new Image();
+                const src = frames[0].dataUrl;
+                const frame = frames[0];
+                if (frame._w && frame._h) {
+                    targetHeight.value = Math.round(w / frame._w * frame._h);
+                    return;
+                }
+                img.onload = () => {
+                    frame._w = img.width;
+                    frame._h = img.height;
+                    targetHeight.value = Math.round(w / img.width * img.height);
+                };
+                img.src = src;
+            } else {
+                targetHeight.value = w;
+            }
+        }
+
+        // 预设宽度按钮
+        document.querySelectorAll('.preset-btn[data-w]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.preset-btn[data-w]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                targetWidth.value = btn.dataset.w;
+                autoHeight();
+            });
+        });
+        targetWidth.addEventListener('input', () => {
+            document.querySelectorAll('.preset-btn[data-w]').forEach(b => {
+                b.classList.toggle('active', b.dataset.w === targetWidth.value);
+            });
+            autoHeight();
+        });
+        const colsInput = document.getElementById('colsInput');
+        const generateSpriteBtn = document.getElementById('generateSpriteBtn');
+        const pixelArtEnabled = document.getElementById('pixelArtEnabled');
+        const pixelArtControls = document.getElementById('pixelArtControls');
+        const pixelSizeInput = document.getElementById('pixelSizeInput');
+        const colorLevelsInput = document.getElementById('colorLevelsInput');
+        const pixelOutlineEnabled = document.getElementById('pixelOutlineEnabled');
+        const spritePreview = document.getElementById('spritePreview');
+        const spriteCanvas = document.getElementById('spriteCanvas');
+        const spriteInfo = document.getElementById('spriteInfo');
+        const downloadSpriteBtn = document.getElementById('downloadSpriteBtn');
+        const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+        const progressOverlay = document.getElementById('progressOverlay');
+        const progressText = document.getElementById('progressText');
+        const progressFill = document.getElementById('progressFill');
+        const progressPercent = document.getElementById('progressPercent');
+
+        // ── 文件上传 ──
+        dropZone.addEventListener('click', () => videoInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('video/')) {
+                loadVideo(file);
+            }
+        });
+
+        videoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) loadVideo(file);
+        });
+
+        const videoUrlInput = document.getElementById('videoUrlInput');
+        const importUrlBtn = document.getElementById('importUrlBtn');
+
+        function loadVideoFromUrl(url) {
+            if (!url) return;
+            video.crossOrigin = 'anonymous';
+            video.src = url;
+            videoPreview.style.display = 'block';
+            extractControls.style.display = 'flex';
+            video.onloadedmetadata = () => {
+                showVideoInfo(null, video.duration);
+                const duration = video.duration;
+                if (duration > 10) {
+                    fpsInput.value = 8;
+                } else if (duration > 5) {
+                    fpsInput.value = 10;
+                }
+            };
+        }
+
+        importUrlBtn.addEventListener('click', () => {
+            const url = videoUrlInput.value.trim();
+            if (url) loadVideoFromUrl(url);
+        });
+
+        videoUrlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const url = videoUrlInput.value.trim();
+                if (url) loadVideoFromUrl(url);
+            }
+        });
+
+        function loadVideo(file) {
+            const url = URL.createObjectURL(file);
+            video.src = url;
+            videoPreview.style.display = 'block';
+            extractControls.style.display = 'flex';
+
+            video.onloadedmetadata = () => {
+                showVideoInfo(file, video.duration);
+                const duration = video.duration;
+                if (duration > 10) {
+                    fpsInput.value = 8;
+                } else if (duration > 5) {
+                    fpsInput.value = 10;
+                }
+            };
+        }
+
+        // ── 显示进度 ──
+        function showProgress(text) {
+            progressText.textContent = text;
+            progressFill.style.width = '0%';
+            progressPercent.textContent = '0%';
+            progressOverlay.style.display = 'flex';
+        }
+
+        function updateProgress(percent) {
+            progressFill.style.width = percent + '%';
+            progressPercent.textContent = Math.round(percent) + '%';
+        }
+
+        function hideProgress() {
+            progressOverlay.style.display = 'none';
+        }
+
+        // ── 拆帧 ──
+        extractBtn.addEventListener('click', async () => {
+            const fps = parseInt(fpsInput.value);
+            if (!fps || fps < 1) return;
+
+            showProgress('正在提取帧...');
+
+            const duration = video.duration;
+            const totalFrames = Math.floor(duration * fps);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            state.frames = [];
+
+            for (let i = 0; i < totalFrames; i++) {
+                const time = i / fps;
+                video.currentTime = time;
+
+                await new Promise(resolve => {
+                    video.onseeked = () => {
+                        ctx.drawImage(video, 0, 0);
+                        const dataUrl = canvas.toDataURL('image/png');
+                        state.frames.push({
+                            id: i,
+                            dataUrl: dataUrl,
+                            _w: canvas.width,
+                            _h: canvas.height,
+                            selected: true
+                        });
+                        updateProgress((i + 1) / totalFrames * 100);
+                        resolve();
+                    };
+                });
+            }
+
+            hideProgress();
+            renderFrames();
+            showSection(framesSection);
+            updateSteps(4);
+            updateFrameCount();
+            showToast(`成功提取 ${totalFrames} 帧`, 'success');
+        });
+
+        // ── 渲染帧网格 ──
+        function renderFrames() {
+            framesGrid.innerHTML = '';
+
+            state.frames.forEach((frame, index) => {
+                const item = document.createElement('div');
+                item.className = 'frame-item' + (frame.selected ? ' selected' : '');
+                item.innerHTML = `
+                    <div class="check-indicator"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+                    <img src="${frame.dataUrl}" alt="Frame ${index + 1}">
+                    <div class="frame-number">#${index + 1}</div>
+                `;
+
+                item.addEventListener('click', (e) => {
+                    if (e.shiftKey && state.lastClickedFrameIndex >= 0) {
+                        const from = Math.min(state.lastClickedFrameIndex, index);
+                        const to = Math.max(state.lastClickedFrameIndex, index);
+                        const newVal = !frame.selected;
+                        for (let i = from; i <= to; i++) {
+                            state.frames[i].selected = newVal;
+                        }
+                    } else {
+                        frame.selected = !frame.selected;
+                    }
+                    state.lastClickedFrameIndex = index;
+                    renderFrames();
+                    updateFrameCount();
+                });
+
+                framesGrid.appendChild(item);
+            });
+
+            totalFramesEl.textContent = state.frames.length;
+        }
+
+        function updateFrameCount() {
+            const selected = state.frames.filter(f => f.selected).length;
+            selectedFramesEl.textContent = selected;
+            toRemoveBgBtn.disabled = selected === 0;
+            document.getElementById('toDirectSpriteBtn').disabled = selected === 0;
+        }
+
+        // 全选/全不选/反选
+        selectAllBtn.addEventListener('click', () => {
+            state.frames.forEach(f => f.selected = true);
+            renderFrames();
+            updateFrameCount();
+        });
+
+        deselectAllBtn.addEventListener('click', () => {
+            state.frames.forEach(f => f.selected = false);
+            renderFrames();
+            updateFrameCount();
+        });
+
+        invertSelectBtn.addEventListener('click', () => {
+            state.frames.forEach(f => f.selected = !f.selected);
+            renderFrames();
+            updateFrameCount();
+        });
+
+        // ── 返回导航 ──
+        document.getElementById('backToUpload').addEventListener('click', () => {
+            hideSection(framesSection);
+            updateSteps(3);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        document.getElementById('backToFramesFromDirect').addEventListener('click', () => {
+            hideSection(document.getElementById('directSpriteSection'));
+            framesSection.style.display = 'block';
+            framesSection.classList.add('visible');
+            updateSteps(4);
+            document.getElementById('directSpriteSection').scrollIntoView({ behavior: 'smooth' });
+        });
+
+        document.getElementById('backToFramesFromBg').addEventListener('click', () => {
+            hideSection(removeBgSection);
+            framesSection.style.display = 'block';
+            framesSection.classList.add('visible');
+            updateSteps(4);
+            document.getElementById('removeBgSection').scrollIntoView({ behavior: 'smooth' });
+        });
+
+        document.getElementById('backToBgFromSprite').addEventListener('click', () => {
+            hideSection(spriteSection);
+            removeBgSection.style.display = 'block';
+            removeBgSection.classList.add('visible');
+            updateSteps(5);
+            document.getElementById('spriteSection').scrollIntoView({ behavior: 'smooth' });
+        });
+
+        // ── 进入抠图步骤 ──
+        toRemoveBgBtn.addEventListener('click', () => {
+            const selectedFrames = state.frames.filter(f => f.selected);
+            if (selectedFrames.length === 0) return;
+
+            const img = new Image();
+            img.onload = () => {
+                pickerCanvas.width = img.width;
+                pickerCanvas.height = img.height;
+                pickerCtx.drawImage(img, 0, 0);
+            };
+            img.src = selectedFrames[0].dataUrl;
+
+            showSection(removeBgSection);
+            updateSteps(5);
+        });
+
+        // ── 颜色选择 ──
+        pickerCanvas.addEventListener('mousemove', (e) => {
+            const rect = pickerCanvas.getBoundingClientRect();
+            const scaleX = pickerCanvas.width / rect.width;
+            const scaleY = pickerCanvas.height / rect.height;
+            const x = Math.floor((e.clientX - rect.left) * scaleX);
+            const y = Math.floor((e.clientY - rect.top) * scaleY);
+
+            pickerCursor.style.display = 'block';
+            pickerCursor.style.left = (e.clientX - rect.left) + 'px';
+            pickerCursor.style.top = (e.clientY - rect.top) + 'px';
+
+            if (x >= 0 && x < pickerCanvas.width && y >= 0 && y < pickerCanvas.height) {
+                const pixel = pickerCtx.getImageData(x, y, 1, 1).data;
+                const hex = rgbToHex(pixel[0], pixel[1], pixel[2]);
+                pickerPreviewColor.style.background = hex;
+                pickerPreviewHex.textContent = hex;
+            }
+        });
+
+        pickerCanvas.addEventListener('mouseleave', () => {
+            pickerCursor.style.display = 'none';
+        });
+
+        pickerCanvas.addEventListener('click', (e) => {
+            const rect = pickerCanvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) * (pickerCanvas.width / rect.width));
+            const y = Math.floor((e.clientY - rect.top) * (pickerCanvas.height / rect.height));
+
+            const pixel = pickerCtx.getImageData(x, y, 1, 1).data;
+            const color = {
+                r: pixel[0],
+                g: pixel[1],
+                b: pixel[2]
+            };
+
+            state.selectedColor = color;
+            const hex = rgbToHex(color.r, color.g, color.b);
+            colorBox.style.background = hex;
+            colorValue.textContent = hex;
+        });
+
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+        }
+
+        // 滑块事件
+        toleranceSlider.addEventListener('input', (e) => {
+            state.tolerance = parseInt(e.target.value);
+            toleranceValue.textContent = state.tolerance;
+        });
+
+        featherSlider.addEventListener('input', (e) => {
+            state.feather = parseInt(e.target.value);
+            featherValue.textContent = state.feather;
+        });
+
+        // 颜色距离计算
+        function colorDistance(c1, c2) {
+            return Math.sqrt(
+                Math.pow(c1.r - c2.r, 2) +
+                Math.pow(c1.g - c2.g, 2) +
+                Math.pow(c1.b - c2.b, 2)
+            );
+        }
+
+        // 抠图处理
+        function removeBackground(sourceCanvas, targetColor, tolerance, feather) {
+            const canvas = document.createElement('canvas');
+            canvas.width = sourceCanvas.width;
+            canvas.height = sourceCanvas.height;
+            const ctx = canvas.getContext('2d');
+
+            ctx.drawImage(sourceCanvas, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const pixel = {
+                    r: data[i],
+                    g: data[i + 1],
+                    b: data[i + 2]
+                };
+
+                const distance = colorDistance(pixel, targetColor);
+
+                if (distance <= tolerance) {
+                    data[i + 3] = 0;
+                } else if (distance <= tolerance + feather * 10) {
+                    const alpha = 255 * (distance - tolerance) / (feather * 10);
+                    data[i + 3] = Math.min(255, Math.max(0, alpha));
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+            return canvas;
+        }
+
+        // 像素画效果处理
+        function applyPixelArt(sourceCanvas, pixelSize, colorLevels, addOutline) {
+            const w = sourceCanvas.width;
+            const h = sourceCanvas.height;
+            const ps = Math.max(2, pixelSize);
+            const cl = Math.max(2, colorLevels);
+
+            const smallW = Math.max(1, Math.ceil(w / ps));
+            const smallH = Math.max(1, Math.ceil(h / ps));
+            const small = document.createElement('canvas');
+            small.width = smallW;
+            small.height = smallH;
+            const sCtx = small.getContext('2d');
+            sCtx.drawImage(sourceCanvas, 0, 0, smallW, smallH);
+
+            const imgData = sCtx.getImageData(0, 0, smallW, smallH);
+            const d = imgData.data;
+            const step = 255 / (cl - 1);
+            for (let i = 0; i < d.length; i += 4) {
+                if (d[i + 3] > 0) {
+                    d[i]     = Math.round(Math.round(d[i] / step) * step);
+                    d[i + 1] = Math.round(Math.round(d[i + 1] / step) * step);
+                    d[i + 2] = Math.round(Math.round(d[i + 2] / step) * step);
+                }
+            }
+            sCtx.putImageData(imgData, 0, 0);
+
+            if (addOutline) {
+                const outline = sCtx.getImageData(0, 0, smallW, smallH);
+                const od = outline.data;
+                const read = new Uint8ClampedArray(od);
+                for (let y = 0; y < smallH; y++) {
+                    for (let x = 0; x < smallW; x++) {
+                        const idx = (y * smallW + x) * 4;
+                        if (read[idx + 3] === 0) {
+                            const neighbors = [[x-1,y],[x+1,y],[x,y-1],[x,y+1]];
+                            for (const [nx, ny] of neighbors) {
+                                if (nx >= 0 && nx < smallW && ny >= 0 && ny < smallH) {
+                                    const nIdx = (ny * smallW + nx) * 4;
+                                    if (read[nIdx + 3] > 0) {
+                                        od[idx] = 20;
+                                        od[idx + 1] = 20;
+                                        od[idx + 2] = 30;
+                                        od[idx + 3] = 255;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                sCtx.putImageData(outline, 0, 0);
+            }
+
+            const result = document.createElement('canvas');
+            result.width = w;
+            result.height = h;
+            const rCtx = result.getContext('2d');
+            rCtx.imageSmoothingEnabled = false;
+            rCtx.drawImage(small, 0, 0, w, h);
+
+            return result;
+        }
+
+        // 像素画开关
+        pixelArtEnabled.addEventListener('change', () => {
+            const on = pixelArtEnabled.checked;
+            pixelArtControls.style.opacity = on ? '1' : '0.4';
+            pixelArtControls.style.pointerEvents = on ? 'auto' : 'none';
+            pixelSizeInput.disabled = !on;
+            colorLevelsInput.disabled = !on;
+            pixelOutlineEnabled.disabled = !on;
+        });
+
+        // 预览抠图效果
+        previewRemoveBtn.addEventListener('click', () => {
+            if (!state.selectedColor) {
+                showToast('请先点击选择要抠除的背景颜色', 'warning');
+                return;
+            }
+
+            const img = new Image();
+            img.onload = () => {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = img.width;
+                tempCanvas.height = img.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(img, 0, 0);
+
+                const result = removeBackground(
+                    tempCanvas,
+                    state.selectedColor,
+                    state.tolerance,
+                    state.feather
+                );
+
+                pickerCanvas.width = result.width;
+                pickerCanvas.height = result.height;
+                pickerCtx.drawImage(result, 0, 0);
+            };
+
+            const selectedFrames = state.frames.filter(f => f.selected);
+            img.src = selectedFrames[0].dataUrl;
+        });
+
+        // 批量抠图
+        batchRemoveBtn.addEventListener('click', async () => {
+            if (!state.selectedColor) {
+                showToast('请先点击选择要抠除的背景颜色', 'warning');
+                return;
+            }
+
+            const selectedFrames = state.frames.filter(f => f.selected);
+            showProgress('正在批量抠图...');
+
+            state.processedFrames = [];
+
+            for (let i = 0; i < selectedFrames.length; i++) {
+                const frame = selectedFrames[i];
+
+                await new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = img.width;
+                        tempCanvas.height = img.height;
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCtx.drawImage(img, 0, 0);
+
+                        const result = removeBackground(
+                            tempCanvas,
+                            state.selectedColor,
+                            state.tolerance,
+                            state.feather
+                        );
+
+                        state.processedFrames.push({
+                            id: frame.id,
+                            dataUrl: result.toDataURL('image/png'),
+                            _w: result.width,
+                            _h: result.height
+                        });
+
+                        updateProgress((i + 1) / selectedFrames.length * 100);
+                        resolve();
+                    };
+                    img.src = frame.dataUrl;
+                });
+            }
+
+            hideProgress();
+            toSpriteBtn.disabled = false;
+            showToast(`成功处理 ${selectedFrames.length} 帧`, 'success');
+        });
+
+        // 进入精灵图合成步骤
+        toSpriteBtn.addEventListener('click', () => {
+            showSection(spriteSection);
+            updateSteps(6);
+            autoHeight();
+        });
+
+        // 生成精灵图
+        generateSpriteBtn.addEventListener('click', () => {
+            if (state.processedFrames.length === 0) return;
+
+            const width = parseInt(targetWidth.value);
+            const height = parseInt(targetHeight.value);
+            const cols = parseInt(colsInput.value);
+            const rows = Math.ceil(state.processedFrames.length / cols);
+
+            spriteCanvas.width = width * cols;
+            spriteCanvas.height = height * rows;
+            const ctx = spriteCanvas.getContext('2d');
+
+            ctx.clearRect(0, 0, spriteCanvas.width, spriteCanvas.height);
+
+            let loaded = 0;
+            const frameData = [];
+
+            state.processedFrames.forEach((frame, index) => {
+                const img = new Image();
+                img.onload = () => {
+                    const col = index % cols;
+                    const row = Math.floor(index / cols);
+                    const x = col * width;
+                    const y = row * height;
+
+                    const fc = document.createElement('canvas');
+                    fc.width = width;
+                    fc.height = height;
+                    const fcCtx = fc.getContext('2d');
+                    fcCtx.clearRect(0, 0, width, height);
+                    const scale = Math.min(width / img.width, height / img.height);
+                    const dw = img.width * scale;
+                    const dh = img.height * scale;
+                    fcCtx.drawImage(img, (width - dw) / 2, (height - dh) / 2, dw, dh);
+
+                    let finalFrame = fc;
+                    if (pixelArtEnabled.checked) {
+                        finalFrame = applyPixelArt(fc,
+                            parseInt(pixelSizeInput.value) || 4,
+                            parseInt(colorLevelsInput.value) || 4,
+                            pixelOutlineEnabled.checked
+                        );
+                    }
+
+                    ctx.drawImage(finalFrame, x, y);
+
+                    frameData.push({
+                        index: index,
+                        name: `frame_${index}`,
+                        x: x,
+                        y: y,
+                        width: width,
+                        height: height,
+                        originalWidth: img.width,
+                        originalHeight: img.height
+                    });
+
+                    loaded++;
+                    if (loaded === state.processedFrames.length) {
+                        spritePreview.style.display = 'block';
+                        spriteInfo.innerHTML = `
+                            尺寸 <strong>${spriteCanvas.width} x ${spriteCanvas.height}</strong> px &nbsp;|&nbsp;
+                            帧数 <strong>${state.processedFrames.length}</strong> &nbsp;|&nbsp;
+                            布局 <strong>${cols} x ${rows}</strong> &nbsp;|&nbsp;
+                            单帧 <strong>${width} x ${height}</strong>
+                        `;
+
+                        state.spriteData = {
+                            image: spriteCanvas.toDataURL('image/png'),
+                            frames: frameData,
+                            meta: {
+                                version: '1.0',
+                                format: 'RGBA8888',
+                                size: { w: spriteCanvas.width, h: spriteCanvas.height },
+                                scale: 1
+                            }
+                        };
+                        showToast('精灵图生成完成', 'success');
+                    }
+                };
+                img.src = frame.dataUrl;
+            });
+        });
+
+        // 下载精灵图
+        downloadSpriteBtn.addEventListener('click', () => {
+            if (!state.spriteData) return;
+
+            const link = document.createElement('a');
+            link.download = 'sprite_sheet.png';
+            link.href = state.spriteData.image;
+            link.click();
+        });
+
+        // 下载JSON元数据
+        downloadJsonBtn.addEventListener('click', () => {
+            if (!state.spriteData) return;
+
+            const json = {
+                frames: {},
+                meta: state.spriteData.meta
+            };
+
+            state.spriteData.frames.forEach(frame => {
+                json.frames[frame.name] = {
+                    frame: { x: frame.x, y: frame.y, w: frame.width, h: frame.height },
+                    rotated: false,
+                    trimmed: false,
+                    spriteSourceSize: { x: 0, y: 0, w: frame.width, h: frame.height },
+                    sourceSize: { w: frame.width, h: frame.height }
+                };
+            });
+
+            const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = 'sprite_sheet.json';
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // ── GIF 编码器 ──
+
+        function buildQuantizer(pixels, maxColors) {
+            const width = pixels.width, height = pixels.height;
+            const data = pixels.data;
+
+            const samples = [];
+            const step = 8;
+            for (let y = 0; y < height; y += step) {
+                for (let x = 0; x < width; x += step) {
+                    const i = (y * width + x) * 4;
+                    if (data[i + 3] > 128) {
+                        samples.push([data[i], data[i + 1], data[i + 2]]);
+                    }
+                }
+            }
+
+            if (samples.length === 0) {
+                const p = new Uint8Array(768);
+                return { palette: p, findIndex: () => 0 };
+            }
+
+            let buckets = [samples];
+            while (buckets.length < maxColors) {
+                let maxIdx = 0, maxRange = 0;
+                for (let i = 0; i < buckets.length; i++) {
+                    const b = buckets[i];
+                    if (b.length < 2) continue;
+                    let rMin = 255, rMax = 0, gMin = 255, gMax = 0, bMin = 255, bMax = 0;
+                    for (const c of b) {
+                        if (c[0] < rMin) rMin = c[0];
+                        if (c[0] > rMax) rMax = c[0];
+                        if (c[1] < gMin) gMin = c[1];
+                        if (c[1] > gMax) gMax = c[1];
+                        if (c[2] < bMin) bMin = c[2];
+                        if (c[2] > bMax) bMax = c[2];
+                    }
+                    const range = Math.max(rMax - rMin, gMax - gMin, bMax - bMin);
+                    if (range > maxRange) { maxRange = range; maxIdx = i; }
+                }
+                if (maxRange === 0) break;
+
+                const b = buckets[maxIdx];
+                let rMin = 255, rMax = 0, gMin = 255, gMax = 0, bMin = 255, bMax = 0;
+                for (const c of b) {
+                    if (c[0] < rMin) rMin = c[0]; if (c[0] > rMax) rMax = c[0];
+                    if (c[1] < gMin) gMin = c[1]; if (c[1] > gMax) gMax = c[1];
+                    if (c[2] < bMin) bMin = c[2]; if (c[2] > bMax) bMax = c[2];
+                }
+                const channel = rMax - rMin >= gMax - gMin && rMax - rMin >= bMax - bMin ? 0 :
+                               gMax - gMin >= bMax - bMin ? 1 : 2;
+                b.sort((a, c) => a[channel] - c[channel]);
+                const mid = b.length >> 1;
+                buckets.splice(maxIdx, 1, b.slice(0, mid), b.slice(mid));
+            }
+
+            const colors = buckets.map(b => {
+                if (b.length === 0) return [0, 0, 0];
+                let r = 0, g = 0, b2 = 0;
+                for (const c of b) { r += c[0]; g += c[1]; b2 += c[2]; }
+                return [r / b.length | 0, g / b.length | 0, b2 / b.length | 0];
+            });
+
+            while (colors.length < 256) colors.push([0, 0, 0]);
+
+            const palette = new Uint8Array(256 * 3);
+            for (let i = 0; i < 256; i++) {
+                palette[i * 3] = colors[i][0];
+                palette[i * 3 + 1] = colors[i][1];
+                palette[i * 3 + 2] = colors[i][2];
+            }
+
+            return { palette, findIndex: (r, g, b2) => {
+                let best = 0, bestDist = Infinity;
+                for (let i = 0; i < colors.length; i++) {
+                    const dr = r - colors[i][0], dg = g - colors[i][1], db = b2 - colors[i][2];
+                    const d = dr * dr + dg * dg + db * db;
+                    if (d < bestDist) { bestDist = d; best = i; }
+                }
+                return best;
+            }};
+        }
+
+        function lzwEncode(pixels, colorDepth) {
+            const minCodeSize = Math.max(2, colorDepth);
+            const clearCode = 1 << minCodeSize;
+            const eoiCode = clearCode + 1;
+
+            const table = new Map();
+            const resetTable = () => {
+                table.clear();
+            };
+
+            let codeSize = minCodeSize + 1;
+            let nextCode = clearCode + 2;
+            const out = [];
+            let buf = 0, cnt = 0;
+            const emit = (code) => {
+                buf |= code << cnt;
+                cnt += codeSize;
+                while (cnt >= 8) { out.push(buf & 0xFF); buf >>>= 8; cnt -= 8; }
+            };
+
+            out.push(minCodeSize);
+            resetTable();
+            emit(clearCode);
+
+            let prefix = pixels[0];
+            for (let i = 1; i < pixels.length; i++) {
+                const k = pixels[i];
+                const combined = (prefix << 8) | k;
+
+                let code = table.get(combined);
+                if (code !== undefined) {
+                    prefix = code;
+                } else {
+                    emit(prefix);
+                    if (nextCode < 4096) {
+                        table.set(combined, nextCode++);
+                        if (nextCode > (1 << codeSize)) codeSize = Math.min(12, codeSize + 1);
+                    } else {
+                        emit(clearCode);
+                        resetTable();
+                        codeSize = minCodeSize + 1;
+                        nextCode = clearCode + 2;
+                    }
+                    prefix = k;
+                }
+            }
+            emit(prefix);
+            emit(eoiCode);
+            if (cnt > 0) out.push(buf & 0xFF);
+            const result = [out[0]];
+            for (let i = 1; i < out.length; i += 255) {
+                const end = Math.min(i + 255, out.length);
+                result.push(end - i);
+                for (let j = i; j < end; j++) result.push(out[j]);
+            }
+            result.push(0);
+            return result;
+        }
+
+        function buildGIF_withPalette(frames, width, height, delayMs, palette, transparentIndex) {
+            const out = [];
+            const w = v => out.push(v & 0xFF);
+            const w16 = v => { out.push(v & 0xFF, (v >> 8) & 0xFF); };
+            const ws = s => { for (let i = 0; i < s.length; i++) out.push(s.charCodeAt(i)); };
+
+            const hasTransparent = transparentIndex >= 0;
+
+            ws('GIF89a');
+            w16(width);
+            w16(height);
+            w(0x87);
+            w(0);
+            w(0);
+
+            for (let i = 0; i < 256; i++) {
+                w(palette[i * 3] || 0);
+                w(palette[i * 3 + 1] || 0);
+                w(palette[i * 3 + 2] || 0);
+            }
+
+            ws('\x21\xFF\x0BNETSCAPE2.0');
+            w(3); w(1);
+            w16(0);
+            w(0);
+
+            const delay = Math.max(2, Math.round(delayMs / 10));
+
+            for (let fi = 0; fi < frames.length; fi++) {
+                const frame = frames[fi];
+
+                ws('\x21\xF9\x04');
+                w(hasTransparent ? 0x09 : 0x04);
+                w16(delay);
+                w(hasTransparent ? transparentIndex : 0);
+                w(0);
+
+                w(0x2C);
+                w16(0); w16(0);
+                w16(width); w16(height);
+                w(0);
+
+                const lzw = lzwEncode(frame.pixels, 8);
+                for (const b of lzw) w(b);
+            }
+
+            w(0x3B);
+            return new Uint8Array(out);
+        }
+
+        // 导出 GIF 按钮
+        document.getElementById('downloadGifBtn').addEventListener('click', async () => {
+            if (!state.processedFrames || state.processedFrames.length === 0) {
+                showToast('请先完成抠图步骤', 'warning');
+                return;
+            }
+
+            const gifFps = parseInt(document.getElementById('gifFpsInput').value) || 12;
+            const frameDelay = Math.round(1000 / gifFps);
+            const fw = parseInt(targetWidth.value) || 512;
+            const fh = parseInt(targetHeight.value) || 512;
+
+            showProgress('正在生成 GIF...');
+
+            const canvas = document.createElement('canvas');
+            canvas.width = fw;
+            canvas.height = fh;
+            const ctx = canvas.getContext('2d');
+
+            const allImgData = [];
+            for (let i = 0; i < state.processedFrames.length; i++) {
+                await new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.clearRect(0, 0, fw, fh);
+                        const scale = Math.min(fw / img.width, fh / img.height);
+                        const dw = img.width * scale;
+                        const dh = img.height * scale;
+                        ctx.drawImage(img, (fw - dw) / 2, (fh - dh) / 2, dw, dh);
+
+                        if (pixelArtEnabled.checked) {
+                            const processed = applyPixelArt(canvas,
+                                parseInt(pixelSizeInput.value) || 4,
+                                parseInt(colorLevelsInput.value) || 4,
+                                pixelOutlineEnabled.checked
+                            );
+                            ctx.clearRect(0, 0, fw, fh);
+                            ctx.drawImage(processed, 0, 0);
+                        }
+
+                        allImgData.push(ctx.getImageData(0, 0, fw, fh));
+                        updateProgress((i + 1) / state.processedFrames.length * 50);
+                        resolve();
+                    };
+                    img.src = state.processedFrames[i].dataUrl;
+                });
+            }
+
+            updateProgress(60);
+
+            const mergedData = {
+                width: fw, height: fh,
+                data: new Uint8ClampedArray(fw * fh * 4)
+            };
+            const mergedLen = fw * fh * 4;
+            for (let i = 0; i < mergedLen; i += 4) {
+                let r = 0, g = 0, b = 0, cnt = 0;
+                for (const imgData of allImgData) {
+                    const a = imgData.data[i + 3];
+                    if (a > 10) {
+                        if (a > 128) {
+                            r += imgData.data[i];
+                            g += imgData.data[i + 1];
+                            b += imgData.data[i + 2];
+                        } else {
+                            const alpha = a / 255;
+                            r += (imgData.data[i] * alpha + 255 * (1 - alpha)) | 0;
+                            g += (imgData.data[i + 1] * alpha + 255 * (1 - alpha)) | 0;
+                            b += (imgData.data[i + 2] * alpha + 255 * (1 - alpha)) | 0;
+                        }
+                        cnt++;
+                    }
+                }
+                if (cnt > 0) {
+                    mergedData.data[i] = r / cnt | 0;
+                    mergedData.data[i + 1] = g / cnt | 0;
+                    mergedData.data[i + 2] = b / cnt | 0;
+                    mergedData.data[i + 3] = 255;
+                }
+            }
+
+            const quantizer = buildQuantizer(mergedData, 255);
+
+            const globalPalette = new Uint8Array(768);
+            for (let i = 0; i < 255; i++) {
+                globalPalette[(i + 1) * 3]     = quantizer.palette[i * 3];
+                globalPalette[(i + 1) * 3 + 1] = quantizer.palette[i * 3 + 1];
+                globalPalette[(i + 1) * 3 + 2] = quantizer.palette[i * 3 + 2];
+            }
+
+            updateProgress(70);
+
+            const gifFrames = allImgData.map(imgData => {
+                const pixels = new Uint8Array(fw * fh);
+                for (let p = 0; p < fw * fh; p++) {
+                    const i = p * 4;
+                    if (imgData.data[i + 3] < 128) {
+                        pixels[p] = 0;
+                    } else {
+                        pixels[p] = quantizer.findIndex(
+                            imgData.data[i],
+                            imgData.data[i + 1],
+                            imgData.data[i + 2]
+                        ) + 1;
+                    }
+                }
+                return { pixels };
+            });
+
+            updateProgress(80);
+
+            const gifBytes = buildGIF_withPalette(gifFrames, fw, fh, frameDelay, globalPalette, 0);
+            hideProgress();
+
+            const blob = new Blob([gifBytes], { type: 'image/gif' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = 'animation.gif';
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('GIF 导出完成', 'success');
+        });
+
+        // ── 直接合成精灵图 ──
+        const directSpriteSection = document.getElementById('directSpriteSection');
+        const directTargetWidth = document.getElementById('directTargetWidth');
+        const directTargetHeight = document.getElementById('directTargetHeight');
+        const directColsInput = document.getElementById('directColsInput');
+        const generateDirectSpriteBtn = document.getElementById('generateDirectSpriteBtn');
+        const directSpritePreview = document.getElementById('directSpritePreview');
+        const directSpriteCanvas = document.getElementById('directSpriteCanvas');
+        const directSpriteInfo = document.getElementById('directSpriteInfo');
+
+        function directAutoHeight() {
+            const w = parseInt(directTargetWidth.value) || 512;
+            const frames = state.frames.filter(f => f.selected);
+            if (frames.length > 0) {
+                const frame = frames[0];
+                if (frame._w && frame._h) {
+                    directTargetHeight.value = Math.round(w / frame._w * frame._h);
+                    return;
+                }
+                const img = new Image();
+                img.onload = () => {
+                    frame._w = img.width;
+                    frame._h = img.height;
+                    directTargetHeight.value = Math.round(w / img.width * img.height);
+                };
+                img.src = frame.dataUrl;
+            } else {
+                directTargetHeight.value = w;
+            }
+        }
+
+        document.querySelectorAll('.preset-btn[data-dw]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.preset-btn[data-dw]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                directTargetWidth.value = btn.dataset.dw;
+                directAutoHeight();
+            });
+        });
+        directTargetWidth.addEventListener('input', () => {
+            document.querySelectorAll('.preset-btn[data-dw]').forEach(b => {
+                b.classList.toggle('active', b.dataset.dw === directTargetWidth.value);
+            });
+            directAutoHeight();
+        });
+
+        document.getElementById('toDirectSpriteBtn').addEventListener('click', () => {
+            const selectedFrames = state.frames.filter(f => f.selected);
+            if (selectedFrames.length === 0) return;
+
+            showSection(directSpriteSection);
+            updateSteps(6);
+            directAutoHeight();
+        });
+
+        generateDirectSpriteBtn.addEventListener('click', () => {
+            const selectedFrames = state.frames.filter(f => f.selected);
+            if (selectedFrames.length === 0) return;
+
+            const width = parseInt(directTargetWidth.value);
+            const height = parseInt(directTargetHeight.value);
+            const cols = parseInt(directColsInput.value);
+            const rows = Math.ceil(selectedFrames.length / cols);
+
+            directSpriteCanvas.width = width * cols;
+            directSpriteCanvas.height = height * rows;
+            const ctx = directSpriteCanvas.getContext('2d');
+            ctx.clearRect(0, 0, directSpriteCanvas.width, directSpriteCanvas.height);
+
+            let loaded = 0;
+            const frameData = [];
+
+            selectedFrames.forEach((frame, index) => {
+                const img = new Image();
+                img.onload = () => {
+                    const col = index % cols;
+                    const row = Math.floor(index / cols);
+                    const x = col * width;
+                    const y = row * height;
+                    const scale = Math.min(width / img.width, height / img.height);
+                    const dw = img.width * scale;
+                    const dh = img.height * scale;
+                    ctx.drawImage(img, x + (width - dw) / 2, y + (height - dh) / 2, dw, dh);
+
+                    frameData.push({
+                        index: index,
+                        name: `frame_${index}`,
+                        x: x,
+                        y: y,
+                        width: width,
+                        height: height,
+                        originalWidth: img.width,
+                        originalHeight: img.height
+                    });
+
+                    loaded++;
+                    if (loaded === selectedFrames.length) {
+                        directSpritePreview.style.display = 'block';
+                        directSpriteInfo.innerHTML = `
+                            尺寸 <strong>${directSpriteCanvas.width} x ${directSpriteCanvas.height}</strong> px &nbsp;|&nbsp;
+                            帧数 <strong>${selectedFrames.length}</strong> &nbsp;|&nbsp;
+                            布局 <strong>${cols} x ${rows}</strong> &nbsp;|&nbsp;
+                            单帧 <strong>${width} x ${height}</strong>
+                        `;
+
+                        state.directSpriteData = {
+                            image: directSpriteCanvas.toDataURL('image/png'),
+                            frames: frameData,
+                            meta: {
+                                version: '1.0',
+                                format: 'RGBA8888',
+                                size: { w: directSpriteCanvas.width, h: directSpriteCanvas.height },
+                                scale: 1
+                            }
+                        };
+                        showToast('精灵图生成完成', 'success');
+                    }
+                };
+                img.src = frame.dataUrl;
+            });
+        });
+
+        document.getElementById('downloadDirectSpriteBtn').addEventListener('click', () => {
+            if (!state.directSpriteData) return;
+            const link = document.createElement('a');
+            link.download = 'sprite_sheet.png';
+            link.href = state.directSpriteData.image;
+            link.click();
+        });
+
+        document.getElementById('downloadDirectJsonBtn').addEventListener('click', () => {
+            if (!state.directSpriteData) return;
+            const json = { frames: {}, meta: state.directSpriteData.meta };
+            state.directSpriteData.frames.forEach(frame => {
+                json.frames[frame.name] = {
+                    frame: { x: frame.x, y: frame.y, w: frame.width, h: frame.height },
+                    rotated: false,
+                    trimmed: false,
+                    spriteSourceSize: { x: 0, y: 0, w: frame.width, h: frame.height },
+                    sourceSize: { w: frame.width, h: frame.height }
+                };
+            });
+            const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = 'sprite_sheet.json';
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+        });
+
+        document.getElementById('downloadDirectGifBtn').addEventListener('click', async () => {
+            const selectedFrames = state.frames.filter(f => f.selected);
+            if (selectedFrames.length === 0) return;
+
+            const gifFps = parseInt(document.getElementById('directGifFpsInput').value) || 12;
+            const frameDelay = Math.round(1000 / gifFps);
+            const fw = parseInt(directTargetWidth.value) || 512;
+            const fh = parseInt(directTargetHeight.value) || 512;
+
+            showProgress('正在生成 GIF...');
+
+            const canvas = document.createElement('canvas');
+            canvas.width = fw;
+            canvas.height = fh;
+            const ctx = canvas.getContext('2d');
+
+            const allImgData = [];
+            for (let i = 0; i < selectedFrames.length; i++) {
+                await new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.clearRect(0, 0, fw, fh);
+                        const scale = Math.min(fw / img.width, fh / img.height);
+                        const dw = img.width * scale;
+                        const dh = img.height * scale;
+                        ctx.drawImage(img, (fw - dw) / 2, (fh - dh) / 2, dw, dh);
+                        allImgData.push(ctx.getImageData(0, 0, fw, fh));
+                        updateProgress((i + 1) / selectedFrames.length * 50);
+                        resolve();
+                    };
+                    img.src = selectedFrames[i].dataUrl;
+                });
+            }
+
+            updateProgress(60);
+
+            const mergedData = {
+                width: fw, height: fh,
+                data: new Uint8ClampedArray(fw * fh * 4)
+            };
+            const mergedLen = fw * fh * 4;
+            for (let i = 0; i < mergedLen; i += 4) {
+                let r = 0, g = 0, b = 0, cnt = 0;
+                for (const imgData of allImgData) {
+                    const a = imgData.data[i + 3];
+                    if (a > 10) {
+                        if (a > 128) {
+                            r += imgData.data[i];
+                            g += imgData.data[i + 1];
+                            b += imgData.data[i + 2];
+                        } else {
+                            const alpha = a / 255;
+                            r += (imgData.data[i] * alpha + 255 * (1 - alpha)) | 0;
+                            g += (imgData.data[i + 1] * alpha + 255 * (1 - alpha)) | 0;
+                            b += (imgData.data[i + 2] * alpha + 255 * (1 - alpha)) | 0;
+                        }
+                        cnt++;
+                    }
+                }
+                if (cnt > 0) {
+                    mergedData.data[i] = r / cnt | 0;
+                    mergedData.data[i + 1] = g / cnt | 0;
+                    mergedData.data[i + 2] = b / cnt | 0;
+                    mergedData.data[i + 3] = 255;
+                }
+            }
+
+            const quantizer = buildQuantizer(mergedData, 255);
+            const globalPalette = new Uint8Array(768);
+            for (let i = 0; i < 255; i++) {
+                globalPalette[(i + 1) * 3]     = quantizer.palette[i * 3];
+                globalPalette[(i + 1) * 3 + 1] = quantizer.palette[i * 3 + 1];
+                globalPalette[(i + 1) * 3 + 2] = quantizer.palette[i * 3 + 2];
+            }
+
+            updateProgress(70);
+
+            const gifFrames = allImgData.map(imgData => {
+                const pixels = new Uint8Array(fw * fh);
+                for (let p = 0; p < fw * fh; p++) {
+                    const i = p * 4;
+                    if (imgData.data[i + 3] < 128) {
+                        pixels[p] = 0;
+                    } else {
+                        pixels[p] = quantizer.findIndex(
+                            imgData.data[i],
+                            imgData.data[i + 1],
+                            imgData.data[i + 2]
+                        ) + 1;
+                    }
+                }
+                return { pixels };
+            });
+
+            updateProgress(80);
+
+            const gifBytes = buildGIF_withPalette(gifFrames, fw, fh, frameDelay, globalPalette, 0);
+            hideProgress();
+
+            const blob = new Blob([gifBytes], { type: 'image/gif' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = 'animation.gif';
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('GIF 导出完成', 'success');
+        });
+    </script>
+</body>
+</html>
