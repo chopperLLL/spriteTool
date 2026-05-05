@@ -157,6 +157,8 @@ input[type=file]{display:none}
 .ctx-menu-item span:first-child{font-size:1rem}
 .node-delete{margin-top:10px;width:100%;padding:5px 12px;font-size:.75rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--danger);border-radius:6px;cursor:pointer;transition:all .2s}
 .node-delete:hover{background:rgba(239,68,68,.2);border-color:var(--danger)}
+.node-delete-confirm{display:flex;gap:8px;margin-top:10px}
+.node-delete-confirm button{flex:1}
 @media(max-width:640px){.wf-node.expanded{width:95vw}}
 </style>
 </head>
@@ -167,6 +169,7 @@ input[type=file]{display:none}
 <div class="zoom-info" id="zoomInfo">100%</div>
 <button class="btn-icon" id="zoomResetBtn" title="重置视图"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
 <button class="btn-icon" id="resetLayoutBtn" title="重置布局"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+<button class="btn-icon" id="addNodeBtn" title="添加节点"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
 <div class="status-badge" id="serviceStatus"><span class="status-dot" id="serviceStatusDot"></span><span id="serviceStatusText">检查中...</span></div>
 <button class="btn-icon" id="settingsBtn" title="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="session-indicator" id="sessionDot"></span></button>
 </div>
@@ -204,40 +207,63 @@ const CC={
 };
 
 // === Node Definitions ===
-const NODES=[
-  {id:'aiImage',icon:'🎨',title:'AI 生图',ins:[{id:'prompt',type:'image',label:'prompt'}],outs:[{id:'images',type:'image',label:'images'}],x:40,y:40},
-  {id:'aiVideo',icon:'🎬',title:'AI 生视频',ins:[{id:'image',type:'image',label:'image'}],outs:[{id:'video',type:'video',label:'video'}],x:300,y:40},
-  {id:'importVideo',icon:'📂',title:'导入视频',ins:[{id:'video',type:'video',label:'video'}],outs:[{id:'video',type:'video',label:'video'}],x:560,y:40},
-  {id:'selectFrames',icon:'🎞',title:'选择帧',ins:[{id:'video',type:'video',label:'video'}],outs:[{id:'frames',type:'frames',label:'frames'}],x:820,y:40},
-  {id:'directSprite',icon:'🖼',title:'直接合成',ins:[{id:'frames',type:'frames',label:'frames'}],outs:[{id:'sprite',type:'sprite',label:'sprite'}],x:820,y:300},
-  {id:'img2img',icon:'✨',title:'图生图',ins:[{id:'images',type:'image',label:'images'}],outs:[{id:'images_out',type:'image',label:'out'}],x:560,y:300},
-  {id:'removeBg',icon:'✂',title:'抠图',ins:[{id:'images',type:'image',label:'images'}],outs:[{id:'processed',type:'image',label:'out'}],x:300,y:300},
-  {id:'composeSprite',icon:'🧩',title:'合成精灵图',ins:[{id:'processed',type:'image',label:'images'}],outs:[{id:'sprite',type:'sprite',label:'sprite'}],x:300,y:560},
-  {id:'export',icon:'💾',title:'导出',ins:[{id:'sprite',type:'sprite',label:'sprite'}],outs:[],x:40,y:560}
+const NODE_CATALOG=[
+  {typeId:'aiImage',icon:'🎨',title:'AI 生图',ins:[],outs:[{id:'images',type:'image',label:'images'}],defaultConfig:{prompt:'',model:'jimeng-4.5',ratio:'1:1',strength:50}},
+  {typeId:'aiVideo',icon:'🎬',title:'AI 生视频',ins:[{id:'image',type:'image',label:'image'}],outs:[{id:'video',type:'video',label:'video'}],defaultConfig:{prompt:'缓慢动画',model:'jimeng-video-3.5-pro',duration:5,ratio:'16:9'}},
+  {typeId:'importVideo',icon:'📂',title:'导入视频',ins:[{id:'video',type:'video',label:'video'}],outs:[{id:'video',type:'video',label:'video'}],defaultConfig:{fps:12,importUrl:''}},
+  {typeId:'selectFrames',icon:'🎞',title:'选择帧',ins:[{id:'video',type:'video',label:'video'}],outs:[{id:'frames',type:'frames',label:'frames'}],defaultConfig:{}},
+  {typeId:'directSprite',icon:'🖼',title:'直接合成',ins:[{id:'frames',type:'frames',label:'frames'}],outs:[{id:'sprite',type:'sprite',label:'sprite'}],defaultConfig:{width:512,cols:4,gifFps:12}},
+  {typeId:'img2img',icon:'✨',title:'图生图',ins:[{id:'images',type:'image',label:'images'}],outs:[{id:'images_out',type:'image',label:'out'}],defaultConfig:{prompt:'',model:'jimeng-4.5',strength:50}},
+  {typeId:'removeBg',icon:'✂',title:'抠图',ins:[{id:'images',type:'image',label:'images'}],outs:[{id:'processed',type:'image',label:'out'}],defaultConfig:{mode:'color',tolerance:30,feather:2}},
+  {typeId:'composeSprite',icon:'🧩',title:'合成精灵图',ins:[{id:'processed',type:'image',label:'images'}],outs:[{id:'sprite',type:'sprite',label:'sprite'}],defaultConfig:{width:512,cols:4,pixelArt:false,pxSize:4,pxLevels:4,pxOutline:false,gifFps:12}},
+  {typeId:'export',icon:'💾',title:'导出',ins:[{id:'sprite',type:'sprite',label:'sprite'}],outs:[],defaultConfig:{gifFps:12}}
 ];
-const DEFAULT_CONNS=[
-  {from:'aiImage',fp:'images',to:'aiVideo',tp:'image'},
-  {from:'aiVideo',fp:'video',to:'importVideo',tp:'video'},
-  {from:'importVideo',fp:'video',to:'selectFrames',tp:'video'},
-  {from:'selectFrames',fp:'frames',to:'removeBg',tp:'images'},
-  {from:'selectFrames',fp:'frames',to:'directSprite',tp:'frames'},
-  {from:'directSprite',fp:'sprite',to:'img2img',tp:'images'},
-  {from:'img2img',fp:'images_out',to:'removeBg',tp:'images'},
-  {from:'removeBg',fp:'processed',to:'composeSprite',tp:'processed'},
-  {from:'composeSprite',fp:'sprite',to:'export',tp:'sprite'}
-];
+const CATALOG_BY_TYPE=Object.fromEntries(NODE_CATALOG.map(nd=>[nd.typeId,nd]));
+function cloneValue(v){return JSON.parse(JSON.stringify(v))}
+function ensureNodeConfig(node){node.config=node.config||cloneValue(node.def.defaultConfig||{});return node.config}
+function ensureNodeRuntime(node){node.runtime=node.runtime||{};return node.runtime}
+function bindConfigValue(node,content,selector,key,options={}){
+  const el=content.querySelector(selector);if(!el)return;
+  const config=ensureNodeConfig(node);
+  const eventName=options.eventName||(el.type==='checkbox'?'change':'input');
+  const readValue=options.readValue||(()=>el.type==='checkbox'?el.checked:el.value);
+  const writeValue=options.writeValue||((value)=>{if(el.type==='checkbox')el.checked=!!value;else if(value!=null)el.value=value});
+  if(config[key]!=null)writeValue(config[key]);
+  el.addEventListener(eventName,()=>{config[key]=readValue();PM.save()});
+}
+const STARTER_FLOW={
+  nodes:[
+    {id:'importVideo_1',typeId:'importVideo',x:120,y:80},
+    {id:'selectFrames_1',typeId:'selectFrames',x:400,y:80},
+    {id:'directSprite_1',typeId:'directSprite',x:720,y:260},
+    {id:'removeBg_1',typeId:'removeBg',x:720,y:80},
+    {id:'composeSprite_1',typeId:'composeSprite',x:1020,y:80},
+    {id:'export_1',typeId:'export',x:1320,y:80}
+  ],
+  conns:[
+    {from:'importVideo_1',fp:'video',to:'selectFrames_1',tp:'video',type:'video'},
+    {from:'selectFrames_1',fp:'frames',to:'removeBg_1',tp:'images',type:'frames'},
+    {from:'selectFrames_1',fp:'frames',to:'directSprite_1',tp:'frames',type:'frames'},
+    {from:'removeBg_1',fp:'processed',to:'composeSprite_1',tp:'processed',type:'image'},
+    {from:'composeSprite_1',fp:'sprite',to:'export_1',tp:'sprite',type:'sprite'}
+  ]
+};
 const PORT_COLORS={image:'#63b3ed',video:'#a78bfa',frames:'#34d399',sprite:'#fbbf24'};
-const COMPAT={image:['image','frames','sprite'],video:['video'],frames:['frames'],sprite:['sprite','image']};
+const INPUT_ACCEPTS={image:['image','frames','sprite'],video:['video'],frames:['frames'],sprite:['sprite']};
+function canConnect(fromType,toType){return(INPUT_ACCEPTS[toType]||[]).includes(fromType)}
 
 // === Node Manager ===
 let _nodeCounter=0;
 const NM={
   nodes:{},selected:null,
-  init(){
-    NODES.forEach(nd=>this.createNode(nd.id,nd.x,nd.y,nd));
+  init(){},
+  collapseAllExpanded(exceptId=null){
+    Object.values(this.nodes).forEach(node=>{
+      if(node.id!==exceptId&&node.expanded)this.collapseNode(node.id);
+    });
   },
   createNode(instanceId,x,y,typeDef){
-    const nd=typeDef||NODES.find(n=>n.id===instanceId);if(!nd)return null;
+    const nd=typeDef||CATALOG_BY_TYPE[instanceId];if(!nd)return null;
     const id=instanceId;
     const el=document.createElement('div');
     el.className='wf-node';el.dataset.id=id;
@@ -246,7 +272,7 @@ const NM={
     let outPorts=nd.outs.map(p=>'<div class="wf-port out" data-port="'+p.id+'" data-type="'+p.type+'"><span>'+p.label+'</span><span class="wf-port-dot" style="border-color:'+PORT_COLORS[p.type]+'"></span></div>').join('');
     el.innerHTML='<div class="wf-node-header"><span class="wf-node-icon">'+nd.icon+'</span><span class="wf-node-title">'+nd.title+'</span><button class="wf-node-fold">_</button></div><div class="wf-node-body" id="body-'+id+'"><div class="wf-node-summary" id="sum-'+id+'">单击展开</div><div class="wf-node-content"></div><div class="wf-ports"><div class="wf-ports-in">'+inPorts+'</div><div class="wf-ports-out">'+outPorts+'</div></div></div>';
     document.getElementById('wfWorld').appendChild(el);
-    this.nodes[id]={id,el,def:nd,typeId:nd.id,collapsed:false,expanded:false,data:null,status:'idle',contentEl:null};
+    this.nodes[id]={id,el,def:nd,typeId:nd.typeId,collapsed:false,expanded:false,data:null,status:'idle',contentEl:null,config:cloneValue(nd.defaultConfig||{}),runtime:{}};
     // Drag header (distinguish click vs drag)
     el.querySelector('.wf-node-header').addEventListener('pointerdown',e=>{
       if(e.target.classList.contains('wf-node-fold'))return;
@@ -259,7 +285,7 @@ const NM={
         el.style.left=(ev.clientX-ox-CC.tx)/CC.scale+'px';el.style.top=(ev.clientY-oy-CC.ty-48)/CC.scale+'px';CM.update();
       };
       const up=()=>{dragging=false;el.style.zIndex='';window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);
-        if(!moved)NM.toggleExpand(id);CM.update()};
+        if(!moved)NM.toggleExpand(id,{multi:e.shiftKey});CM.update()};
       window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);
     });
     // Fold
@@ -270,6 +296,12 @@ const NM={
     });
     // Select
     el.addEventListener('click',e=>{if(this.selected&&this.selected!==id)this.nodes[this.selected].el.classList.remove('selected');this.selected=id;el.classList.add('selected')});
+    el.querySelectorAll('.wf-port.in').forEach(port=>{
+      port.addEventListener('contextmenu',e=>{
+        e.preventDefault();e.stopPropagation();
+        CM.openInputDisconnectMenu(id,port.dataset.port,e.clientX,e.clientY);
+      });
+    });
     // Port drag
     el.querySelectorAll('.wf-port-dot').forEach(dot=>{
       dot.addEventListener('pointerdown',e=>{
@@ -290,9 +322,9 @@ const NM={
             const tp=target.closest('.wf-port');if(tp&&!tp.classList.contains('out')){
               const tNode=tp.closest('.wf-node');
               const fromType=port.dataset.type;const toType=tp.dataset.type;
-              if(COMPAT[toType]&&COMPAT[toType].includes(fromType)){
-                CM.addConn(id,port.dataset.port,tNode.dataset.id,tp.dataset.port,fromType);
-              }
+              if(CM.pendingReconnect){CM.completeReconnect(tNode.dataset.id,tp.dataset.port,toType)}
+              else if(canConnect(fromType,toType)){CM.addConn(id,port.dataset.port,tNode.dataset.id,tp.dataset.port,fromType)}
+              else showToast('端口类型不兼容','warning');
             }
           }
           window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);
@@ -311,16 +343,18 @@ const NM={
     showToast('已删除节点','info');
   },
   addNodeAt(typeId,screenX,screenY){
-    const nd=NODES.find(n=>n.id===typeId);if(!nd)return;
-    _nodeCounter++;const id=nd.id+'_'+_nodeCounter;
+    const nd=CATALOG_BY_TYPE[typeId];if(!nd)return;
+    let id='';do{_nodeCounter++;id=nd.typeId+'_'+_nodeCounter}while(this.nodes[id]);
     const wx=(screenX-CC.tx)/CC.scale,wy=(screenY-CC.ty-48)/CC.scale;
     this.createNode(id,wx,wy,nd);
     return id;
   },
-  toggleExpand(id){
+  toggleExpand(id,options={}){
     const n=this.nodes[id];if(!n)return;
-    if(n.expanded){this.collapseNode(id)}
-    else{this.expandNode(id)}
+    const multi=!!options.multi;
+    if(n.expanded){this.collapseNode(id);return}
+    if(!multi)this.collapseAllExpanded(id);
+    this.expandNode(id);
   },
   expandNode(id){
     const n=this.nodes[id];if(!n)return;
@@ -329,9 +363,19 @@ const NM={
     if(body)body.classList.remove('collapsed');
     n.el.querySelector('.wf-node-fold').textContent='_';
     const content=n.el.querySelector('.wf-node-content');n.contentEl=content;
+    n.runtime=n.runtime||{};
     const renderer=NODE_RENDERERS[n.typeId];
-    if(renderer&&content){content.innerHTML=renderer.render(n)+'<button class="node-delete" data-del="'+id+'">删除此节点</button>';renderer.bind(n,content);
-      content.querySelector('.node-delete').addEventListener('click',()=>NM.deleteNode(id));
+    if(renderer&&content){
+      const deleteHtml=n.runtime.pendingDelete
+        ? '<div class="node-delete-confirm"><button class="danger" data-confirm-del="'+id+'">确认删除</button><button class="secondary" data-cancel-del="'+id+'">取消</button></div>'
+        : '<button class="node-delete" data-del="'+id+'">删除此节点</button>';
+      content.innerHTML=renderer.render(n)+deleteHtml;renderer.bind(n,content);
+      const deleteBtn=content.querySelector('[data-del]');
+      if(deleteBtn)deleteBtn.addEventListener('click',()=>{n.runtime.pendingDelete=true;NM.expandNode(id)});
+      const confirmBtn=content.querySelector('[data-confirm-del]');
+      if(confirmBtn)confirmBtn.addEventListener('click',()=>NM.deleteNode(id));
+      const cancelBtn=content.querySelector('[data-cancel-del]');
+      if(cancelBtn)cancelBtn.addEventListener('click',()=>{n.runtime.pendingDelete=false;NM.expandNode(id)});
     }
     // 两次 update：50ms 用于初始 DOM 布局，350ms 用于 CSS transition (300ms width ease) 完成后
     setTimeout(()=>CM.update(),50);setTimeout(()=>CM.update(),350);
@@ -354,25 +398,50 @@ const NM={
 
 // === Connection Manager ===
 const CM={
-  conns:[],svg:null,
+  conns:[],svg:null,pendingReconnect:null,
   init(){this.svg=document.getElementById('wfConnections');
     // Click to delete connection
     this.svg.addEventListener('click',e=>{if(e.target.tagName==='path'&&!e.target.classList.contains('wf-temp-line')){
       const idx=this.conns.findIndex(c=>c.el===e.target);
-      if(idx>=0){this.conns.splice(idx,1);this.svg.removeChild(e.target)}}});
+      if(idx>=0){this.removeConn(this.conns[idx])}}});
     // Right-click connection to show disconnect menu
     this.svg.addEventListener('contextmenu',e=>{
       if(e.target.tagName==='path'&&!e.target.classList.contains('wf-temp-line')){
         e.preventDefault();e.stopPropagation();
         const c=this.conns.find(c=>c.el===e.target);if(!c)return;
-        const menu=document.getElementById('ctxMenu');
-        menu.innerHTML='<div class="ctx-menu-item" id="ctxDisconnect">断开连线 ('+NM.nodes[c.from].def.title+' -> '+NM.nodes[c.to].def.title+')</div>';
-        menu.style.left=e.clientX+'px';menu.style.top=e.clientY+'px';menu.classList.add('vis');
-        document.getElementById('ctxDisconnect').addEventListener('click',()=>{
-          const idx=this.conns.indexOf(c);if(idx>=0){this.conns.splice(idx,1);this.svg.removeChild(c.el)}menu.classList.remove('vis');
-        });
+        openContextMenu(e.clientX,e.clientY,[
+          {label:'断开连线',action:()=>this.removeConn(c)},
+          {label:'重新连接',action:()=>this.beginReconnect(c)}
+        ]);
       }
     });
+  },
+  removeConn(conn){
+    const idx=this.conns.indexOf(conn);
+    if(idx>=0)this.conns.splice(idx,1);
+    if(conn.el&&conn.el.parentNode)conn.el.parentNode.removeChild(conn.el);
+  },
+  beginReconnect(conn){
+    this.pendingReconnect={snapshot:{from:conn.from,fp:conn.fp,to:conn.to,tp:conn.tp,type:conn.type}};
+    this.removeConn(conn);
+    showToast('选择新的输入端口，或点击空白取消','info',2500);
+  },
+  cancelReconnect(){
+    if(!this.pendingReconnect)return;
+    const snap=this.pendingReconnect.snapshot;this.pendingReconnect=null;
+    this.addConn(snap.from,snap.fp,snap.to,snap.tp,snap.type);
+  },
+  completeReconnect(toId,tp,toType){
+    if(!this.pendingReconnect)return;
+    const snap=this.pendingReconnect.snapshot;
+    this.pendingReconnect=null;
+    if(!canConnect(snap.type,toType)){this.addConn(snap.from,snap.fp,snap.to,snap.tp,snap.type);showToast('端口类型不兼容，已恢复原连接','warning');return}
+    this.addConn(snap.from,snap.fp,toId,tp,snap.type);
+  },
+  openInputDisconnectMenu(nodeId,portId,x,y){
+    const upstream=this.getUpstream(nodeId,portId);
+    if(!upstream.length){showToast('该输入端口没有连接','info');return}
+    openContextMenu(x,y,upstream.map(conn=>({label:'断开 '+NM.nodes[conn.from].def.title+' → '+NM.nodes[conn.to].def.title,action:()=>this.removeConn(conn)})));
   },
   addConn(from,fp,to,tp,type){
     this.conns=this.conns.filter(c=>{if(c.to===to&&c.tp===tp){if(c.el&&c.el.parentNode)c.el.parentNode.removeChild(c.el);return false}return true});
@@ -411,6 +480,7 @@ const CM={
       n.data=n.data||{};
       const toType=n.def.ins.find(p=>p.id===c.tp);
       const converted=convertData(data,c.type,toType?toType.type:c.type);
+      if(converted===null){showToast('端口类型不兼容','warning');return}
       n.data[c.tp]=converted;NM.setSummary(c.to,converted.summary||'已接收数据');
     });
   },
@@ -418,41 +488,55 @@ const CM={
 
 function convertData(data,fromType,toType){
   if(fromType===toType)return data;
-  if(toType==='image'&&fromType==='frames'&&data.frames){
+  if(fromType==='frames'&&toType==='image'&&data.frames){
     const urls=data.frames.filter(f=>f.selected!==false).map(f=>f.dataUrl);
     return{urls,summary:data.summary||(urls.length+' 张图片')};
   }
-  if(toType==='image'&&fromType==='sprite'&&data.dataUrl){
+  if(fromType==='sprite'&&toType==='image'&&data.dataUrl){
     return{urls:[data.dataUrl],summary:data.summary||'精灵图'};
   }
-  if(toType==='frames'&&fromType==='image'&&data.urls){
-    const frames=data.urls.map((u,i)=>({id:i,dataUrl:u,_w:0,_h:0,selected:true}));
-    return{frames,summary:data.summary||(frames.length+' 帧')};
-  }
-  return data;
+  return null;
 }
 
 // === Persistence ===
 const PM={
   KEY:'spritetool_wf_layout',
   save(){
-    const d={nodes:{},conns:CM.conns.map(c=>({from:c.from,fp:c.fp,to:c.to,tp:c.tp,type:c.type}))};
-    Object.entries(NM.nodes).forEach(([id,n])=>{d.nodes[id]={x:parseInt(n.el.style.left),y:parseInt(n.el.style.top),col:n.collapsed,typeId:n.typeId}});
+    const d={
+      version:3,
+      nodes:Object.values(NM.nodes).map(n=>({id:n.id,typeId:n.typeId,x:parseInt(n.el.style.left),y:parseInt(n.el.style.top),collapsed:!!n.collapsed,config:cloneValue(n.config||{})})),
+      conns:CM.conns.map(c=>({from:c.from,fp:c.fp,to:c.to,tp:c.tp,type:c.type}))
+    };
     localStorage.setItem(this.KEY,JSON.stringify(d));
   },
+  inflate(d){
+    Object.values(NM.nodes).forEach(n=>{if(n.el&&n.el.parentNode)n.el.parentNode.removeChild(n.el)});
+    NM.nodes={};NM.selected=null;
+    CM.conns.forEach(c=>{if(c.el&&c.el.parentNode)c.el.parentNode.removeChild(c.el)});CM.conns=[];
+    d.nodes.forEach(entry=>{
+      const nd=CATALOG_BY_TYPE[entry.typeId];if(!nd)return;
+      NM.createNode(entry.id,entry.x,entry.y,nd);
+      const node=NM.nodes[entry.id];
+      node.config=cloneValue(entry.config||nd.defaultConfig||{});
+      node.collapsed=!!entry.collapsed;
+      if(node.collapsed){node.el.querySelector('.wf-node-body').classList.add('collapsed');node.el.querySelector('.wf-node-fold').textContent='+'}
+    });
+    d.conns.forEach(c=>{if(NM.nodes[c.from]&&NM.nodes[c.to])CM.addConn(c.from,c.fp,c.to,c.tp,c.type)});
+  },
+  migrateLegacyLayout(legacy){
+    if(!legacy||!legacy.nodes||!legacy.conns)return null;
+    const nodes=Object.entries(legacy.nodes).map(([id,v])=>{
+      const typeId=v.typeId||(CATALOG_BY_TYPE[id]?id:null);
+      if(!typeId)return null;
+      return{id,typeId,x:v.x,y:v.y,collapsed:!!v.col,config:cloneValue(CATALOG_BY_TYPE[typeId].defaultConfig||{})};
+    });
+    if(nodes.some(n=>!n))return null;
+    return{version:3,nodes,conns:legacy.conns};
+  },
   load(){
-    try{const d=JSON.parse(localStorage.getItem(this.KEY));if(!d)return false;
-      // Create nodes that don't exist yet (from saved layout with typeId)
-      Object.entries(d.nodes).forEach(([id,v])=>{
-        if(NM.nodes[id])return;
-        const nd=NODES.find(n=>n.id===v.typeId);if(!nd)return;
-        NM.createNode(id,v.x,v.y,nd);
-      });
-      // Restore positions and fold state
-      Object.entries(d.nodes).forEach(([id,v])=>{const n=NM.nodes[id];if(n){n.el.style.left=v.x+'px';n.el.style.top=v.y+'px';if(v.col){n.collapsed=true;n.el.querySelector('.wf-node-body').classList.add('collapsed');n.el.querySelector('.wf-node-fold').textContent='+'}}});
-      CM.conns.forEach(c=>{if(c.el&&c.el.parentNode)c.el.parentNode.removeChild(c.el)});CM.conns=[];
-      d.conns.forEach(c=>{if(NM.nodes[c.from]&&NM.nodes[c.to])CM.addConn(c.from,c.fp,c.to,c.tp,c.type)});
-      return true;
+    try{const raw=JSON.parse(localStorage.getItem(this.KEY));if(!raw)return false;
+      const d=raw.version===3?raw:this.migrateLegacyLayout(raw);if(!d)return false;
+      this.inflate(d);return true;
     }catch{return false}
   },
   reset(){localStorage.removeItem(this.KEY);location.reload()}
@@ -530,7 +614,7 @@ function renderImg2Img(){
 }
 function renderRemoveBg(){
   return '<div style="margin-bottom:8px;display:flex;gap:4px"><button class="secondary" id="d_bgAiTab" style="flex:1;padding:5px">AI 抠图</button><button class="secondary" id="d_bgColorTab" style="flex:1;padding:5px;border-color:var(--accent);color:var(--accent)">颜色抠图</button></div>'+
-  '<div id="d_bgAiPanel" style="display:none"><div class="hint">AI 自动去除背景。</div><div id="d_bgAiStatus" style="text-align:center;padding:14px 0"><p style="color:var(--text-dim);margin-bottom:8px;font-size:.78rem">点击开始 AI 抠图</p><button class="accent" id="d_bgAiStart">开始 AI 抠图</button></div><div id="d_bgAiProg" style="display:none;text-align:center;padding:8px 0"><div class="progress-bar" style="max-width:220px;margin:0 auto 6px"><div class="progress-fill" id="d_bgAiFill" style="width:0"></div></div><p style="color:var(--text-dim);font-size:.78rem" id="d_bgAiProgTxt">0/0</p></div></div>'+
+  '<div id="d_bgAiPanel" style="display:none"><div class="hint">AI 自动去除背景。</div><div id="d_bgAiStatus" style="text-align:center;padding:14px 0"><p style="color:var(--text-dim);margin-bottom:8px;font-size:.78rem">点击开始 AI 抠图</p><button class="accent" id="d_bgAiStart">开始 AI 抠图</button></div><div id="d_bgAiProg" style="display:none;text-align:center;padding:8px 0"><div class="progress-bar" style="max-width:220px;margin:0 auto 6px"><div class="progress-fill" id="d_bgAiFill" style="width:0"></div></div><p style="color:var(--text-dim);font-size:.78rem" id="d_bgAiProgTxt">0/0</p><div class="frames-grid" id="d_bgAiThumbs" style="margin-top:10px"></div></div></div>'+
   '<div id="d_bgColorPanel"><div class="hint">点击图片选择背景色，调整容差后批量处理。</div><div class="color-picker-area"><div class="picker-preview"><div class="picker-canvas-container" id="d_pickerCtn"><canvas id="pickerCanvas"></canvas><div class="picker-cursor" id="pickerCursor"><div class="pc" id="pickerPreviewColor"></div><div class="ph" id="pickerPreviewHex"></div></div></div></div><div class="picker-controls"><div class="color-display"><div class="color-box" id="colorBox"></div><div class="color-value" id="colorValue">#000000</div></div><div class="slider-group"><label>容差 <span class="val" id="toleranceValue">30</span></label><input type="range" id="toleranceSlider" min="0" max="100" value="30"></div><div class="slider-group"><label>羽化 <span class="val" id="featherValue">2</span></label><input type="range" id="featherSlider" min="0" max="10" value="2"></div><div class="btn-group" style="margin-top:8px"><button id="previewRemoveBtn">预览</button><button class="accent" id="batchRemoveBtn">批量处理</button></div></div></div></div>';
 }
 function renderComposeSprite(){
@@ -653,6 +737,8 @@ async function useAiVideo(url,aiVideoNodeId){
 // --- Import Video ---
 function bindImportVideo(node,content){
   const $=s=>content.querySelector(s);
+  bindConfigValue(node,content,'#d_fps','fps',{readValue:()=>Number($('#d_fps').value),eventName:'change'});
+  bindConfigValue(node,content,'#d_impUrl','importUrl');
   const drop=$('#d_impDrop'),fileIn=$('#d_impFile');
   const pv=S.pendingVideos[node.id];if(pv){loadVideoBlob(node.id,pv.blobUrl,pv.name);delete S.pendingVideos[node.id]}
   else{const upData=CM.getInputData(node.id,'video');if(upData){loadVideoBlob(node.id,upData.url||upData.blobUrl,'AI 视频')}
@@ -748,6 +834,9 @@ function bindSelectFrames(node,content){
 function bindDirectSprite(node,content){
   const $=s=>content.querySelector(s);
   bindPresetBtns(content,'[data-dw]','#d_dW',autoDH);
+  bindConfigValue(node,content,'#d_dW','width',{readValue:()=>Number($('#d_dW').value),eventName:'change'});
+  bindConfigValue(node,content,'#d_dCols','cols',{readValue:()=>Number($('#d_dCols').value),eventName:'change'});
+  bindConfigValue(node,content,'#d_dGifFps','gifFps',{readValue:()=>Number($('#d_dGifFps').value),eventName:'change'});
   $('#d_dW').addEventListener('input',autoDH);
   function autoDH(){const w=parseInt($('#d_dW').value)||512;const fs=S.frames.filter(f=>f.selected);if(fs.length&&fs[0]._w){$('#d_dH').value=Math.round(w/fs[0]._w*fs[0]._h)}}
   if(S.directSpriteData){
@@ -804,34 +893,43 @@ function bindImg2Img(node,content){
 
 // --- Remove BG ---
 let aiRemoveBgLib=null;
+function renderAiThumbGrid(node,content){
+  const runtime=ensureNodeRuntime(node);
+  const grid=content.querySelector('#d_bgAiThumbs');
+  if(!grid)return;
+  const thumbs=runtime.aiThumbs||[];
+  grid.innerHTML=thumbs.map(item=>'<div class="frame-item selected"><img src="'+item.url+'"><div class="frame-number">#'+item.index+'</div></div>').join('');
+}
+
 function bindRemoveBg(node,content){
   const $=s=>content.querySelector(s);
+  const config=ensureNodeConfig(node);const runtime=ensureNodeRuntime(node);
+  S.tolerance=config.tolerance??S.tolerance;S.feather=config.feather??S.feather;
+  $('#toleranceSlider').value=S.tolerance;$('#toleranceValue').textContent=S.tolerance;
+  $('#featherSlider').value=S.feather;$('#featherValue').textContent=S.feather;
   const aiTab=$('#d_bgAiTab'),colTab=$('#d_bgColorTab'),aiP=$('#d_bgAiPanel'),colP=$('#d_bgColorPanel');
   aiTab.addEventListener('click',()=>{aiP.style.display='block';colP.style.display='none';aiTab.style.borderColor='var(--accent)';aiTab.style.color='var(--accent)';colTab.style.borderColor='';colTab.style.color=''});
   colTab.addEventListener('click',()=>{aiP.style.display='none';colP.style.display='block';colTab.style.borderColor='var(--accent)';colTab.style.color='var(--accent)';aiTab.style.borderColor='';aiTab.style.color=''});
-  if(S.processedFrames.length){
-    $('#d_bgAiStatus').innerHTML='<p style="color:var(--success);margin-bottom:6px;font-size:.78rem">已处理 '+S.processedFrames.length+' 帧</p><button class="accent" id="d_bgAiStart">重新抠图</button>';
-  }
+  if(runtime.aiThumbs&&runtime.aiThumbs.length){$('#d_bgAiStatus').innerHTML='<p style="color:var(--success);margin-bottom:6px;font-size:.78rem">已处理 '+runtime.aiThumbs.length+' 帧</p><button class="accent" id="d_bgAiStart">重新抠图</button>'}
+  renderAiThumbGrid(node,content);
   // AI remove bg
   content.querySelector('#d_bgAiStart')&&content.querySelector('#d_bgAiStart').addEventListener('click',async()=>{
     const fs=S.frames.filter(f=>f.selected);if(!fs.length){showToast('请先选择帧','warning');return}
     NM.setStatus(node.id,'processing');
-    // Ensure thumbnail grid container exists
-    let grid=$('#d_bgAiGrid');if(!grid){grid=document.createElement('div');grid.id='d_bgAiGrid';grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:4px;margin-top:8px';$('#d_bgAiProg').after(grid)}
-    grid.innerHTML='';S.processedFrames=[];
+    runtime.aiThumbs=[];runtime.processedFrames=[];renderAiThumbGrid(node,content);
     try{const lib=await loadAiLib();
       $('#d_bgAiProg').style.display='block';$('#d_bgAiStatus').style.display='none';
-      for(let i=0;i<fs.length;i++){const blob=await (await fetch(fs[i].dataUrl)).blob();const rb=await lib.removeBackground(blob);const url=URL.createObjectURL(rb);
+      for(let i=0;i<fs.length;i++){
+        const blob=await (await fetch(fs[i].dataUrl)).blob();const rb=await lib.removeBackground(blob);const url=URL.createObjectURL(rb);
         const img=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=url});
-        S.processedFrames.push({id:fs[i].id,dataUrl:url,_w:img.width,_h:img.height});
+        runtime.processedFrames.push({id:fs[i].id,dataUrl:url,_w:img.width,_h:img.height});
+        runtime.aiThumbs.push({index:i+1,url});
+        S.processedFrames=runtime.processedFrames;
         $('#d_bgAiFill').style.width=(i+1)/fs.length*100+'%';$('#d_bgAiProgTxt').textContent=(i+1)+'/'+fs.length;
-        // Add thumbnail immediately
-        const thumb=document.createElement('div');thumb.style.cssText='border-radius:4px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1;background:repeating-conic-gradient(rgba(255,255,255,.03) 0% 25%,transparent 0% 50%) 0 0/8px 8px';
-        thumb.innerHTML='<img src="'+url+'" style="width:100%;height:100%;object-fit:cover;display:block"><div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);color:#fff;font-size:.6rem;padding:1px 3px;text-align:center">'+(i+1)+'</div>';
-        thumb.style.position='relative';grid.appendChild(thumb);
+        renderAiThumbGrid(node,content);
       }
       NM.setStatus(node.id,'done');NM.setSummary(node.id,fs.length+' 帧已处理');
-      CM.pushData(node.id,'processed',{frames:S.processedFrames,summary:fs.length+' 帧已处理'});showToast('抠图完成','success');
+      CM.pushData(node.id,'processed',{frames:runtime.processedFrames,summary:fs.length+' 帧已处理'});showToast('抠图完成','success');
       $('#d_bgAiProg').style.display='none';$('#d_bgAiStatus').style.display='block';
       const startBtn=content.querySelector('#d_bgAiStart');if(startBtn)startBtn.textContent='重新抠图';
     }catch(e){showToast('AI 抠图失败: '+e.message,'error');$('#d_bgAiProg').style.display='none';$('#d_bgAiStatus').style.display='block';const sb=content.querySelector('#d_bgAiStart');if(sb)sb.textContent='重试';NM.setStatus(node.id,'idle')}
@@ -845,8 +943,8 @@ function bindRemoveBg(node,content){
     if(x>=0&&x<cv.width&&y>=0&&y<cv.height){const px=ctx.getImageData(x,y,1,1).data;const hex=rgbHex(px[0],px[1],px[2]);$('#pickerPreviewColor').style.background=hex;$('#pickerPreviewHex').textContent=hex}});
   cv.addEventListener('mouseleave',()=>cur.style.display='none');
   cv.addEventListener('click',e=>{const r=cv.getBoundingClientRect();const x=Math.floor((e.clientX-r.left)*(cv.width/r.width)),y=Math.floor((e.clientY-r.top)*(cv.height/r.height));const px=ctx.getImageData(x,y,1,1).data;S.selectedColor={r:px[0],g:px[1],b:px[2]};const hex=rgbHex(px[0],px[1],px[2]);$('#colorBox').style.background=hex;$('#colorValue').textContent=hex});
-  $('#toleranceSlider').addEventListener('input',e=>{S.tolerance=parseInt(e.target.value);$('#toleranceValue').textContent=S.tolerance});
-  $('#featherSlider').addEventListener('input',e=>{S.feather=parseInt(e.target.value);$('#featherValue').textContent=S.feather});
+  $('#toleranceSlider').addEventListener('input',e=>{S.tolerance=parseInt(e.target.value);config.tolerance=S.tolerance;$('#toleranceValue').textContent=S.tolerance;PM.save()});
+  $('#featherSlider').addEventListener('input',e=>{S.feather=parseInt(e.target.value);config.feather=S.feather;$('#featherValue').textContent=S.feather;PM.save()});
   $('#previewRemoveBtn').addEventListener('click',()=>{if(!S.selectedColor){showToast('先选背景色','warning');return}const fs2=S.frames.filter(f=>f.selected);const img=new Image();img.onload=()=>{const tc=document.createElement('canvas');tc.width=img.width;tc.height=img.height;tc.getContext('2d').drawImage(img,0,0);const res=removeBg(tc,S.selectedColor,S.tolerance,S.feather);cv.width=res.width;cv.height=res.height;ctx.drawImage(res,0,0)};img.src=fs2[0].dataUrl});
   $('#batchRemoveBtn').addEventListener('click',async()=>{if(!S.selectedColor){showToast('先选背景色','warning');return}const fs2=S.frames.filter(f=>f.selected);showProgress('批量抠图...');S.processedFrames=[];NM.setStatus(node.id,'processing');
     for(let i=0;i<fs2.length;i++){await new Promise(r=>{const img=new Image();img.onload=()=>{const tc=document.createElement('canvas');tc.width=img.width;tc.height=img.height;tc.getContext('2d').drawImage(img,0,0);const res=removeBg(tc,S.selectedColor,S.tolerance,S.feather);S.processedFrames.push({id:fs2[i].id,dataUrl:res.toDataURL('image/png'),_w:res.width,_h:res.height});updateProgress((i+1)/fs2.length*100);r()};img.src=fs2[i].dataUrl})}
@@ -983,16 +1081,36 @@ function dl(content,name,type){const b=new Blob([content],{type});const u=URL.cr
 function bindPresetBtns(content,sel,inputSel,autoFn){content.querySelectorAll(sel).forEach(btn=>{btn.addEventListener('click',()=>{content.querySelectorAll(sel).forEach(b=>b.classList.remove('active'));btn.classList.add('active');content.querySelector(inputSel).value=btn.dataset.dw||btn.dataset.w;autoFn()})})}
 
 // === Settings ===
+function openContextMenu(x,y,items){
+  const menu=document.getElementById('ctxMenu');
+  menu.innerHTML=items.map((item,index)=>'<div class="ctx-menu-item" data-ctx-index="'+index+'">'+item.label+'</div>').join('');
+  menu.querySelectorAll('.ctx-menu-item').forEach(item=>{
+    item.addEventListener('click',()=>{
+      const index=Number(item.dataset.ctxIndex);
+      menu.classList.remove('vis');
+      items[index].action();
+    });
+  });
+  menu.style.left=x+'px';menu.style.top=y+'px';menu.classList.add('vis');
+}
+
 document.getElementById('settingsBtn').addEventListener('click',()=>{document.getElementById('sessionIdInput').value=S.sessionid;document.getElementById('settingsModal').classList.add('vis')});
 document.getElementById('settingsCancelBtn').addEventListener('click',()=>document.getElementById('settingsModal').classList.remove('vis'));
 document.getElementById('settingsSaveBtn').addEventListener('click',()=>{const v=document.getElementById('sessionIdInput').value.trim();S.sessionid=v;localStorage.setItem('jimeng_sessionid',v);document.getElementById('settingsModal').classList.remove('vis');updateSessionStatus();showToast(v?'已保存':'已清除','success')});
-document.getElementById('serviceStatus').addEventListener('click',async()=>{const s=await refreshServiceStatus();if(document.getElementById('serviceStatusText').textContent==='后端不可达'){showToast('请先运行 node server.js','warning',4000);return}const acts={running:{l:'重启',a:'restart'},starting:{l:'强制重启',a:'restart'},stopped:{l:'启动',a:'start'},error:{l:'重启',a:'restart'}};const o=acts[s]||acts.error;if(confirm('是否'+o.l+' AI 服务？'))callServiceAction(o.a)});
+document.getElementById('serviceStatus').addEventListener('click',async e=>{const s=await refreshServiceStatus();if(document.getElementById('serviceStatusText').textContent==='后端不可达'){showToast('请先运行 node server.js','warning',4000);return}const acts={running:{label:'重启 AI 服务',action:'restart'},starting:{label:'强制重启 AI 服务',action:'restart'},stopped:{label:'启动 AI 服务',action:'start'},error:{label:'重启 AI 服务',action:'restart'}};const entry=acts[s]||acts.error;openContextMenu(e.clientX,e.clientY,[{label:entry.label,action:()=>callServiceAction(entry.action)}])});
 refreshServiceStatus();setInterval(refreshServiceStatus,10000);
 document.getElementById('resetLayoutBtn').addEventListener('click',()=>PM.reset());
+document.getElementById('addNodeBtn').addEventListener('click',e=>{openContextMenu(e.clientX,e.clientY,NODE_CATALOG.map(nd=>({label:nd.icon+' '+nd.title,action:()=>{const point=CC.screenToWorld(window.innerWidth/2,180);NM.addNodeAt(nd.typeId,point.x,point.y);PM.save()}})))});
+
+function loadStarterFlow(){
+  STARTER_FLOW.nodes.forEach(nd=>NM.createNode(nd.id,nd.x,nd.y,CATALOG_BY_TYPE[nd.typeId]));
+  STARTER_FLOW.conns.forEach(c=>CM.addConn(c.from,c.fp,c.to,c.tp,c.type));
+}
 
 // === Init ===
 CC.init();NM.init();CM.init();
-if(!PM.load()){DEFAULT_CONNS.forEach(c=>CM.addConn(c.from,c.fp,c.to,c.tp,c.type))}
+document.getElementById('wfCanvas').addEventListener('click',e=>{if(e.target===CC.canvas||e.target===CC.world||e.target.tagName==='svg'){CM.cancelReconnect();NM.collapseAllExpanded();document.getElementById('ctxMenu').classList.remove('vis')}});
+if(!PM.load())loadStarterFlow();
 updateSessionStatus();
 setInterval(()=>PM.save(),5000);
 // === Context Menu ===
@@ -1006,7 +1124,7 @@ setInterval(()=>PM.save(),5000);
     const canvasEl=e.target.closest('.wf-canvas');
     if(!canvasEl)return;
     e.preventDefault();
-    menu.innerHTML=NODES.map(nd=>'<div class="ctx-menu-item" data-type="'+nd.id+'"><span>'+nd.icon+'</span><span>'+nd.title+'</span></div>').join('');
+    menu.innerHTML=NODE_CATALOG.map(nd=>'<div class="ctx-menu-item" data-type="'+nd.typeId+'"><span>'+nd.icon+'</span><span>'+nd.title+'</span></div>').join('');
     menu.querySelectorAll('.ctx-menu-item').forEach(item=>{
       item.addEventListener('click',()=>{NM.addNodeAt(item.dataset.type,e.clientX,e.clientY);hideMenu();PM.save()});
     });

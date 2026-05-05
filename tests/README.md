@@ -30,14 +30,18 @@ npm test
   - 端口配置
   - 路径安全检查
 
-- `frontend.test.js` - 测试 sprite-tool.html 的结构和功能
-  - HTML 结构完整性
-  - 6 步骤导航
-  - AI 生图/生视频功能
-  - Session 管理
-  - API 调用
-  - AI 抠图
-  - CSS 样式
+- `frontend.test.js` - 测试 v3 节点工作流结构
+  - starter flow 与节点目录
+  - 显式添加入口与右键菜单
+  - 节点展开策略与删除确认
+  - 类型适配边界与连线重连入口
+  - AI 抠图逐帧反馈容器
+  - 禁止使用 `alert()` / `confirm()`
+
+### 前端脚本语法检查
+```bash
+node -e "const fs=require('node:fs');const html=fs.readFileSync('sprite-tool.html','utf8');const m=html.match(/<script>([\\s\\S]*)<\\/script>/);if(!m)throw new Error('script not found');new Function(m[1]);console.log('sprite-tool script syntax OK');"
+```
 
 ## 添加新测试
 
