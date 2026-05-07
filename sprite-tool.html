@@ -160,6 +160,22 @@ input[type=file]{display:none}
 .node-delete-confirm{display:flex;gap:8px;margin-top:10px}
 .node-delete-confirm button{flex:1}
 @media(max-width:640px){.wf-node.expanded{width:95vw}}
+.results-panel{position:fixed;top:48px;right:0;bottom:0;width:340px;background:var(--bg-secondary);border-left:1px solid var(--border);z-index:95;transform:translateX(100%);transition:transform .22s ease;display:flex;flex-direction:column}
+.results-panel.open{transform:translateX(0)}
+.results-panel-header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.results-panel-title{font-size:.9rem;font-weight:600;color:var(--text)}
+.results-panel-list{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.result-empty{padding:18px 12px;border:1px dashed var(--border);border-radius:10px;color:var(--text-muted);font-size:.8rem;text-align:center}
+.result-card{border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.03);overflow:hidden}
+.result-preview{height:140px;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center}
+.result-preview img,.result-preview video{max-width:100%;max-height:100%;display:block}
+.result-body{padding:10px}
+.result-type{font-size:.72rem;color:var(--accent);margin-bottom:4px}
+.result-summary{font-size:.82rem;color:var(--text);line-height:1.45;margin-bottom:4px;word-break:break-word}
+.result-meta{font-size:.72rem;color:var(--text-muted);line-height:1.45;word-break:break-word}
+.result-path{margin-top:4px;font-family:monospace;font-size:.68rem;color:var(--text-muted);word-break:break-all}
+.result-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.result-actions button{flex:1;min-width:88px;padding:6px 10px;font-size:.75rem}
 </style>
 </head>
 <body>
@@ -170,17 +186,23 @@ input[type=file]{display:none}
 <button class="btn-icon" id="zoomResetBtn" title="重置视图"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
 <button class="btn-icon" id="resetLayoutBtn" title="重置布局"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
 <button class="btn-icon" id="addNodeBtn" title="添加节点"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
+<button class="btn-icon" id="collapseNodesBtn" title="收起所有节点">收起</button>
+<button class="btn-icon" id="resultsBtn" title="结果库">结果库</button>
 <div class="status-badge" id="serviceStatus"><span class="status-dot" id="serviceStatusDot"></span><span id="serviceStatusText">检查中...</span></div>
 <button class="btn-icon" id="settingsBtn" title="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="session-indicator" id="sessionDot"></span></button>
 </div>
 <div class="wf-canvas" id="wfCanvas"><div class="wf-world" id="wfWorld"><svg class="wf-connections" id="wfConnections"></svg></div></div>
+<div class="results-panel" id="resultsPanel"><div class="results-panel-header"><div class="results-panel-title">结果库</div><div class="spacer"></div><button class="btn-icon" id="resultsRefreshBtn" title="刷新结果">刷新</button><button class="btn-icon" id="resultsCloseBtn" title="关闭结果库">关闭</button></div><div class="results-panel-list" id="resultsList"></div></div>
 <div class="modal-overlay" id="settingsModal"><div class="modal"><h3>即梦 AI 设置</h3><p>输入即梦 AI 的 sessionid 以启用 AI 功能。</p><p style="color:var(--text-muted);font-size:.75rem">获取：jimeng.jianying.com -&gt; F12 -&gt; Cookies -&gt; sessionid</p><input type="text" id="sessionIdInput" placeholder="粘贴 sessionid..."><div class="btn-row"><button class="secondary" id="settingsCancelBtn">取消</button><button class="accent" id="settingsSaveBtn">保存</button></div></div></div>
 <div class="progress-overlay" id="progressOverlay"><div class="progress-box"><div class="progress-text" id="progressText">正在处理...</div><div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div><div class="progress-percent" id="progressPercent">0%</div></div></div>
 <div class="ctx-menu" id="ctxMenu"></div>
 <div class="toast-container" id="toastContainer"></div>
 <script>
 // === State ===
-const S={video:null,frames:[],processedFrames:[],selectedColor:null,tolerance:30,feather:2,lastClickedFrame:-1,sessionid:localStorage.getItem('jimeng_sessionid')||'',generatedImages:{},selectedImages:{},generatedVideo:null,spriteData:null,directSpriteData:null,img2imgResults:{},pendingVideos:{}};
+const S={video:null,frames:[],processedFrames:[],selectedColor:null,tolerance:30,feather:2,lastClickedFrame:-1,sessionid:localStorage.getItem('jimeng_sessionid')||'',generatedImages:{},selectedImages:{},generatedVideo:null,spriteData:null,directSpriteData:null,img2imgResults:{},pendingVideos:{},resultLibrary:[]};
+const RESULT_TYPE_LABELS={image:'AI 图片',video:'AI 视频',gif:'GIF',sprite:'精灵图'};
+const RESULT_REUSE_TARGETS={image:['aiImage','img2img','removeBg','export'],video:['importVideo'],sprite:['export','removeBg','aiImage'],gif:[]};
+
 // === Toast ===
 function showToast(msg,type='info',dur=3000){const c=document.getElementById('toastContainer');const t=document.createElement('div');t.className='toast '+type;const icons={info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',success:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',warning:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',error:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'};t.innerHTML=(icons[type]||icons.info)+'<span>'+msg+'</span>';c.appendChild(t);setTimeout(()=>{t.classList.add('out');t.addEventListener('animationend',()=>t.remove())},dur)}
 // === Progress ===
@@ -208,7 +230,7 @@ const CC={
 
 // === Node Definitions ===
 const NODE_CATALOG=[
-  {typeId:'aiImage',icon:'🎨',title:'AI 生图',ins:[],outs:[{id:'images',type:'image',label:'images'}],defaultConfig:{prompt:'',model:'jimeng-4.5',ratio:'1:1',strength:50}},
+  {typeId:'aiImage',icon:'🎨',title:'AI 生图',ins:[{id:'images',type:'image',label:'images'}],outs:[{id:'images',type:'image',label:'images'}],defaultConfig:{prompt:'',model:'jimeng-4.5',ratio:'1:1',strength:50}},
   {typeId:'aiVideo',icon:'🎬',title:'AI 生视频',ins:[{id:'image',type:'image',label:'image'}],outs:[{id:'video',type:'video',label:'video'}],defaultConfig:{prompt:'缓慢动画',model:'jimeng-video-3.5-pro',duration:5,ratio:'16:9'}},
   {typeId:'importVideo',icon:'📂',title:'导入视频',ins:[{id:'video',type:'video',label:'video'}],outs:[{id:'video',type:'video',label:'video'}],defaultConfig:{fps:12,importUrl:''}},
   {typeId:'selectFrames',icon:'🎞',title:'选择帧',ins:[{id:'video',type:'video',label:'video'}],outs:[{id:'frames',type:'frames',label:'frames'}],defaultConfig:{}},
@@ -216,7 +238,7 @@ const NODE_CATALOG=[
   {typeId:'img2img',icon:'✨',title:'图生图',ins:[{id:'images',type:'image',label:'images'}],outs:[{id:'images_out',type:'image',label:'out'}],defaultConfig:{prompt:'',model:'jimeng-4.5',strength:50}},
   {typeId:'removeBg',icon:'✂',title:'抠图',ins:[{id:'images',type:'image',label:'images'}],outs:[{id:'processed',type:'image',label:'out'}],defaultConfig:{mode:'color',tolerance:30,feather:2}},
   {typeId:'composeSprite',icon:'🧩',title:'合成精灵图',ins:[{id:'processed',type:'image',label:'images'}],outs:[{id:'sprite',type:'sprite',label:'sprite'}],defaultConfig:{width:512,cols:4,pixelArt:false,pxSize:4,pxLevels:4,pxOutline:false,gifFps:12}},
-  {typeId:'export',icon:'💾',title:'导出',ins:[{id:'sprite',type:'sprite',label:'sprite'}],outs:[],defaultConfig:{gifFps:12}}
+  {typeId:'export',icon:'💾',title:'导出',ins:[{id:'sprite',type:'sprite',label:'sprite'},{id:'images',type:'image',label:'images'}],outs:[],defaultConfig:{gifFps:12}}
 ];
 const CATALOG_BY_TYPE=Object.fromEntries(NODE_CATALOG.map(nd=>[nd.typeId,nd]));
 function cloneValue(v){return JSON.parse(JSON.stringify(v))}
@@ -397,6 +419,104 @@ const NM={
 };
 
 // === Connection Manager ===
+function ensureNodeDataStore(node){
+  node.data=node.data||{};
+  node.data.inputs=node.data.inputs||{};
+  node.data.outputs=node.data.outputs||{};
+  return node.data;
+}
+function getPrimaryDataUrl(data){
+  if(!data)return null;
+  return data.url||data.blobUrl||data.dataUrl||(data.urls&&data.urls[0])||null;
+}
+function buildImageSourceUrl(url){
+  if(!url||typeof url!=='string')return url;
+  if(url.startsWith('blob:')||url.startsWith('data:'))return url;
+  if(url.startsWith('/api/jimeng/image-download?url='))return url;
+  try{
+    const parsed=new URL(url,window.location.origin);
+    if(parsed.origin===window.location.origin&&parsed.pathname==='/api/jimeng/image-download')return parsed.toString();
+  }catch{}
+  return '/api/jimeng/image-download?url='+encodeURIComponent(url);
+}
+function buildVideoSourceUrl(url){
+  if(!url||typeof url!=='string')return url;
+  if(url.startsWith('blob:')||url.startsWith('data:'))return url;
+  if(url.startsWith('/api/jimeng/video-download?url='))return url;
+  try{
+    const parsed=new URL(url,window.location.origin);
+    if(parsed.origin===window.location.origin&&parsed.pathname==='/api/jimeng/video-download')return parsed.toString();
+  }catch{}
+  return '/api/jimeng/video-download?url='+encodeURIComponent(url);
+}
+function syncNodeInputPreview(nodeId,portId,data){
+  const node=NM.nodes[nodeId];
+  if(!node||!node.expanded||!node.contentEl)return;
+  const content=node.contentEl;
+  if(node.typeId==='aiVideo'&&portId==='image'){
+    const frameDiv=content.querySelector('#d_vfFrame');if(!frameDiv)return;
+    const url=getPrimaryDataUrl(data);
+    frameDiv.innerHTML=url?'<img src="'+url+'" style="max-width:100%;max-height:150px;border-radius:6px">':'<p style="color:var(--text-muted);font-size:.78rem">等待上游输入...</p>';
+    return;
+  }
+  if(node.typeId==='importVideo'&&portId==='video'){
+    const url=getPrimaryDataUrl(data);
+    if(url)loadVideoBlob(nodeId,url,data.summary||'上游视频');
+    return;
+  }
+  if(node.typeId==='selectFrames'&&portId==='frames'){
+    if(data&&Array.isArray(data.frames)){
+      const syncFrames=()=>CM.pushData(nodeId,'frames',getSelectedFramePayload(data.frames));
+      renderFrameGrid(content,data.frames,syncFrames);
+    }
+    return;
+  }
+  if(node.typeId==='directSprite'&&portId==='frames'){
+    const heightInput=content.querySelector('#d_dH');
+    const widthInput=content.querySelector('#d_dW');
+    const frames=getSelectedFrames(data&&Array.isArray(data.frames)?data.frames:[]);
+    if(heightInput&&widthInput&&frames.length&&frames[0]._w){
+      const w=parseInt(widthInput.value)||512;
+      heightInput.value=Math.round(w/frames[0]._w*frames[0]._h);
+    }
+    return;
+  }
+  if(node.typeId==='img2img'&&portId==='images'){
+    const input=content.querySelector('#d_i2iInput');if(!input)return;
+    const urls=data&&data.urls?data.urls:[];
+    input.innerHTML=urls.length?urls.map(u=>'<img src="'+u+'" style="max-width:90px;max-height:70px;border-radius:4px;margin:2px">').join(''):'<p style="color:var(--text-muted);font-size:.78rem">等待上游输入</p>';
+    return;
+  }
+  if(node.typeId==='removeBg'&&portId==='images'){
+    const cv=content.querySelector('#pickerCanvas');
+    if(!cv)return;
+    const ctx=cv.getContext('2d');
+    const previewUrl=(data&&data.urls&&data.urls[0])||null;
+    const safePreviewUrl=buildImageSourceUrl(previewUrl);
+    if(safePreviewUrl){const img=new Image();img.onload=()=>{cv.width=img.width;cv.height=img.height;ctx.drawImage(img,0,0)};img.src=safePreviewUrl}
+    return;
+  }
+  if(node.typeId==='composeSprite'&&portId==='processed'){
+    const heightInput=content.querySelector('#d_sH');
+    const widthInput=content.querySelector('#d_sW');
+    const frames=data&&Array.isArray(data.frames)?data.frames:[];
+    if(heightInput&&widthInput&&frames.length&&frames[0]._w){
+      const w=parseInt(widthInput.value)||512;
+      heightInput.value=Math.round(w/frames[0]._w*frames[0]._h);
+    }
+    return;
+  }
+  if(node.typeId==='export'&&portId==='sprite'){
+    const preview=content.querySelector('#d_expPreview');if(!preview)return;
+    preview.innerHTML=data&&data.dataUrl?'<img src="'+data.dataUrl+'" style="max-width:100%;border-radius:6px">':'<p style="color:var(--text-muted);font-size:.78rem">等待精灵图数据...</p>';
+    return;
+  }
+  if(node.typeId==='export'&&portId==='images'){
+    const preview=content.querySelector('#d_expPreview');if(!preview)return;
+    const url=getPrimaryDataUrl(data);
+    preview.innerHTML=url?'<img src="'+url+'" style="max-width:100%;border-radius:6px">':'<p style="color:var(--text-muted);font-size:.78rem">等待图片数据...</p>';
+  }
+}
 const CM={
   conns:[],svg:null,pendingReconnect:null,
   init(){this.svg=document.getElementById('wfConnections');
@@ -416,9 +536,21 @@ const CM={
       }
     });
   },
+  applyConnData(conn,data){
+    const n=NM.nodes[conn.to];if(!n)return;
+    const store=ensureNodeDataStore(n);
+    const toType=n.def.ins.find(p=>p.id===conn.tp);
+    const converted=convertData(data,conn.type,toType?toType.type:conn.type);
+    if(converted===null){showToast('端口类型不兼容','warning');return}
+    store.inputs[conn.tp]=converted;
+    NM.setSummary(conn.to,converted.summary||'已接收数据');
+    syncNodeInputPreview(conn.to,conn.tp,converted);
+  },
   removeConn(conn){
     const idx=this.conns.indexOf(conn);
     if(idx>=0)this.conns.splice(idx,1);
+    const targetNode=NM.nodes[conn.to];
+    if(targetNode&&targetNode.data&&targetNode.data.inputs)delete targetNode.data.inputs[conn.tp];
     if(conn.el&&conn.el.parentNode)conn.el.parentNode.removeChild(conn.el);
   },
   beginReconnect(conn){
@@ -444,11 +576,17 @@ const CM={
     openContextMenu(x,y,upstream.map(conn=>({label:'断开 '+NM.nodes[conn.from].def.title+' → '+NM.nodes[conn.to].def.title,action:()=>this.removeConn(conn)})));
   },
   addConn(from,fp,to,tp,type){
-    this.conns=this.conns.filter(c=>{if(c.to===to&&c.tp===tp){if(c.el&&c.el.parentNode)c.el.parentNode.removeChild(c.el);return false}return true});
+    this.conns=this.conns.filter(c=>{if(c.to===to&&c.tp===tp){if(c.el&&c.el.parentNode)c.el.parentNode.removeChild(c.el);const targetNode=NM.nodes[c.to];if(targetNode&&targetNode.data&&targetNode.data.inputs)delete targetNode.data.inputs[c.tp];return false}return true});
     const path=document.createElementNS('http://www.w3.org/2000/svg','path');
     path.style.stroke=PORT_COLORS[type]||'#63b3ed';
     this.svg.appendChild(path);
-    this.conns.push({from,fp,to,tp,type,el:path});
+    const conn={from,fp,to,tp,type,el:path};
+    this.conns.push(conn);
+    const fromNode=NM.nodes[from];
+    if(fromNode){
+      const store=ensureNodeDataStore(fromNode);
+      if(store.outputs[fp]!=null)this.applyConnData(conn,store.outputs[fp]);
+    }
     this.update();
   },
   update(){
@@ -466,23 +604,32 @@ const CM={
   getUpstream(nodeId,portId){return this.conns.filter(c=>c.to===nodeId&&c.tp===portId)},
   getDownstream(nodeId,portId){return this.conns.filter(c=>c.from===nodeId&&c.fp===portId)},
   getInputData(nodeId,portId){
+    const node=NM.nodes[nodeId];
+    if(node){
+      const store=ensureNodeDataStore(node);
+      if(store.inputs[portId]!=null)return store.inputs[portId];
+    }
     const upstream=this.getUpstream(nodeId,portId);
     if(!upstream.length)return null;
     if(upstream.length>1)console.warn('CM.getInputData: 多上游连接,仅取第一个',nodeId,portId,upstream.length);
     const conn=upstream[0];
     const fromNode=NM.nodes[conn.from];
-    if(!fromNode||!fromNode.data)return null;
-    return fromNode.data[conn.fp];
+    if(!fromNode)return null;
+    const store=ensureNodeDataStore(fromNode);
+    return store.outputs[conn.fp]??null;
+  },
+  getOutputData(nodeId,portId){
+    const node=NM.nodes[nodeId];if(!node)return null;
+    const store=ensureNodeDataStore(node);
+    return store.outputs[portId]??null;
   },
   pushData(nodeId,portId,data){
-    this.getDownstream(nodeId,portId).forEach(c=>{
-      const n=NM.nodes[c.to];if(!n)return;
-      n.data=n.data||{};
-      const toType=n.def.ins.find(p=>p.id===c.tp);
-      const converted=convertData(data,c.type,toType?toType.type:c.type);
-      if(converted===null){showToast('端口类型不兼容','warning');return}
-      n.data[c.tp]=converted;NM.setSummary(c.to,converted.summary||'已接收数据');
-    });
+    const node=NM.nodes[nodeId];
+    if(node){
+      const store=ensureNodeDataStore(node);
+      store.outputs[portId]=data;
+    }
+    this.getDownstream(nodeId,portId).forEach(c=>this.applyConnData(c,data));
   },
 };
 
@@ -490,24 +637,203 @@ function convertData(data,fromType,toType){
   if(fromType===toType)return data;
   if(fromType==='frames'&&toType==='image'&&data.frames){
     const urls=data.frames.filter(f=>f.selected!==false).map(f=>f.dataUrl);
-    return{urls,summary:data.summary||(urls.length+' 张图片')};
+    return{urls,frames:data.frames,summary:data.summary||(urls.length+' 张图片')};
   }
   if(fromType==='sprite'&&toType==='image'&&data.dataUrl){
-    return{urls:[data.dataUrl],summary:data.summary||'精灵图'};
+    return{urls:[data.dataUrl],sourceFrames:data.sourceFrames||null,spriteFrames:data.frames||null,meta:data.meta||null,summary:data.summary||'精灵图'};
   }
   return null;
 }
+function getSelectedFrames(frames){return(frames||[]).filter(f=>f.selected!==false)}
+function getSelectedFramePayload(frames,summarySuffix='帧'){const selectedFrames=getSelectedFrames(frames);return{frames:selectedFrames,summary:selectedFrames.length+' '+summarySuffix}}
+function getNodeFrameOutput(node){
+  const data=CM.getOutputData(node.id,'frames');
+  return data&&Array.isArray(data.frames)?data.frames:[];
+}
+function getNodeFrameSource(node){
+  const inputData=CM.getInputData(node.id,'frames');
+  if(inputData&&Array.isArray(inputData.frames)&&inputData.frames.length)return inputData.frames;
+  const outputData=CM.getOutputData(node.id,'frames');
+  if(outputData&&Array.isArray(outputData.frames)&&outputData.frames.length)return outputData.frames;
+  return [];
+}
+function getNodeFrameInput(node){
+  const data=CM.getInputData(node.id,'frames');
+  return data&&Array.isArray(data.frames)?data.frames:[];
+}
+function getNodeImageFrames(node){
+  const data=CM.getInputData(node.id,'images');
+  return data&&Array.isArray(data.frames)?data.frames:[];
+}
+function renderUrlGrid(container,urls){
+  if(!container)return;
+  container.innerHTML='<div class="frames-grid">'+urls.map((url,idx)=>'<div class="frame-item selected"><img src="'+url+'"><div class="frame-number">#'+(idx+1)+'</div></div>').join('')+'</div>';
+}
+function buildUrlFrames(urls){
+  return(urls||[]).map((url,idx)=>({id:idx,dataUrl:buildImageSourceUrl(url),selected:true}));
+}
+function loadImageElement(url){
+  return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=url});
+}
+function getSpriteFrameRect(frame){
+  if(!frame)return{x:0,y:0,w:0,h:0};
+  if(frame.frame)return{x:frame.frame.x||0,y:frame.frame.y||0,w:frame.frame.w||0,h:frame.frame.h||0};
+  return{x:frame.x||0,y:frame.y||0,w:frame.width||frame.w||0,h:frame.height||frame.h||0};
+}
+async function buildFramesFromSpriteData(spriteData){
+  const spriteUrl=getPrimaryDataUrl(spriteData);
+  const spriteFrames=spriteData&&Array.isArray(spriteData.spriteFrames)?spriteData.spriteFrames:(spriteData&&Array.isArray(spriteData.frames)?spriteData.frames:[]);
+  if(!spriteUrl||!spriteFrames.length)return buildUrlFrames(spriteData&&spriteData.urls?spriteData.urls:[]);
+  const img=await loadImageElement(spriteUrl);
+  return spriteFrames.map((frame,idx)=>{const rect=getSpriteFrameRect(frame);const c=document.createElement('canvas');c.width=rect.w;c.height=rect.h;const ctx=c.getContext('2d');ctx.drawImage(img,rect.x,rect.y,rect.w,rect.h,0,0,rect.w,rect.h);return{id:idx,dataUrl:c.toDataURL('image/png'),_w:rect.w,_h:rect.h,selected:true}});
+}
+async function buildFramesFromSpriteAtlas(spriteData){
+  return buildFramesFromSpriteData(spriteData);
+}
+async function resolveImageInputFrames(node){
+  const data=CM.getInputData(node.id,'images');
+  if(data&&Array.isArray(data.frames)&&data.frames.length)return data.frames;
+  if(data&&Array.isArray(data.spriteFrames)&&data.spriteFrames.length)return buildFramesFromSpriteData(data);
+  if(data&&Array.isArray(data.urls)&&data.urls.length)return buildUrlFrames(data.urls);
+  return [];
+}
+function getNodeProcessedFrames(node){
+  const data=CM.getInputData(node.id,'processed');
+  return data&&Array.isArray(data.frames)?data.frames:S.processedFrames;
+}
 
-// === Persistence ===
+function getResultPreviewList(result){
+  if(!result||!result.data)return [];
+  if(Array.isArray(result.data.urls))return result.data.urls.filter(Boolean);
+  const primary=getPrimaryDataUrl(result.data);
+  return primary?[primary]:[];
+}
+function getResultPreviewUrl(result){const list=getResultPreviewList(result);return result&&result.previewUrl?result.previewUrl:(list[0]||null)}
+function getResultDownloadUrl(result){
+  if(!result)return null;
+  if(result.fileUrl)return result.fileUrl;
+  if(result.downloadUrl)return result.downloadUrl;
+  if(result.data)return getPrimaryDataUrl(result.data);
+  return null;
+}
+function renderResultsPanel(){
+  const list=document.getElementById('resultsList');
+  if(!list)return;
+  const items=(S.resultLibrary||[]).slice().sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));
+  if(!items.length){list.innerHTML='<div class="result-empty">暂无结果记录</div>';return}
+  list.innerHTML=items.map(item=>{
+    const previews=getResultPreviewList(item);
+    const preview=getResultPreviewUrl(item);
+    const typeLabel=RESULT_TYPE_LABELS[item.type]||item.type||'结果';
+    const time=item.createdAt?new Date(item.createdAt).toLocaleString():'未知时间';
+    const previewHtml=item.type==='video'&&preview
+      ? '<video src="'+preview+'" controls preload="metadata"></video>'
+      : previews.length>1
+        ? '<div class="frames-grid">'+previews.map((url,idx)=>'<div class="frame-item selected" style="aspect-ratio:1/1"><img src="'+url+'" loading="lazy"><div class="frame-number">#'+(idx+1)+'</div></div>').join('')+'</div>'
+        : preview
+          ? '<img src="'+preview+'" loading="lazy">'
+          : '<div class="result-empty">无预览</div>';
+    return '<div class="result-card" data-result-id="'+item.id+'"><div class="result-preview">'+previewHtml+'</div><div class="result-body"><div class="result-type">'+typeLabel+'</div><div class="result-summary">'+(item.summary||'未命名结果')+'</div><div class="result-meta">来源节点：'+(item.sourceNodeType||'-')+' · '+time+'</div>'+(item.prompt?'<div class="result-meta">描述：'+item.prompt+'</div>':'')+(item.filePath?'<div class="result-path">'+item.filePath+'</div>':'')+'<div class="result-actions"><button class="secondary" data-result-download="'+item.id+'">下载</button><button class="accent" data-result-reuse="'+item.id+'">复用</button></div></div></div>';
+  }).join('');
+  list.querySelectorAll('[data-result-download]').forEach(btn=>btn.addEventListener('click',()=>downloadResultRecord(btn.dataset.resultDownload)));
+  list.querySelectorAll('[data-result-reuse]').forEach(btn=>btn.addEventListener('click',()=>reuseResultRecord(btn.dataset.resultReuse)));
+}
+function toggleResultsPanel(forceOpen){
+  const panel=document.getElementById('resultsPanel');
+  if(!panel)return;
+  const shouldOpen=typeof forceOpen==='boolean'?forceOpen:!panel.classList.contains('open');
+  panel.classList.toggle('open',shouldOpen);
+  if(shouldOpen){PM.loadResults();renderResultsPanel();}
+}
+function buildResultRecord(type,node,data,summary,extra={}){
+  const nodeId=node&&node.id?node.id:(extra.sourceNodeId||'unknown');
+  const nodeType=node&&node.typeId?node.typeId:(extra.sourceNodeType||'unknown');
+  return {
+    id:'result_'+Date.now()+'_'+Math.random().toString(16).slice(2,8),
+    type,
+    createdAt:new Date().toISOString(),
+    sourceNodeId:nodeId,
+    sourceNodeType:nodeType,
+    prompt:extra.prompt||'',
+    summary:summary||extra.summary||type,
+    previewUrl:extra.previewUrl||getPrimaryDataUrl(data)||'',
+    downloadUrl:extra.downloadUrl||getPrimaryDataUrl(data)||'',
+    fileUrl:extra.fileUrl||'',
+    filePath:extra.filePath||'',
+    data:cloneValue(data||{}),
+    meta:cloneValue(extra.meta||{})
+  };
+}
+async function persistResultRecord(record){
+  try{
+    const r=await fetch('/api/results',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(record)});
+    if(!r.ok)return record;
+    const saved=await r.json().catch(()=>null);
+    return saved&&saved.record?saved.record:record;
+  }catch{return record}
+}
+async function recordResult(type,node,data,summary,extra={}){
+  const record=buildResultRecord(type,node,data,summary,extra);
+  const saved=await persistResultRecord(record);
+  S.resultLibrary=S.resultLibrary||[];
+  S.resultLibrary.unshift(saved);
+  PM.saveResults();
+  renderResultsPanel();
+  return saved;
+}
+function downloadResultRecord(resultId){
+  const result=(S.resultLibrary||[]).find(item=>item.id===resultId);
+  if(!result)return;
+  const url=getResultDownloadUrl(result);
+  if(!url){showToast('该结果没有可下载地址','warning');return}
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=(result.type||'result')+(result.type==='gif'?'.gif':result.type==='video'?'.mp4':'.png');
+  a.target='_blank';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+function buildReusePayloadForResult(result){
+  if(!result)return null;
+  if(result.type==='image')return{type:'image',payload:result.data&&result.data.urls?result.data:{urls:getResultPreviewList(result),summary:result.summary||'图片结果'}};
+  if(result.type==='video')return{type:'video',payload:result.data&&result.data.url?result.data:{url:result.previewUrl||result.downloadUrl,summary:result.summary||'视频结果'}};
+  if(result.type==='sprite')return{type:'sprite',payload:result.data||null};
+  return null;
+}
+function reuseResultRecord(resultId){
+  const result=(S.resultLibrary||[]).find(item=>item.id===resultId);
+  if(!result){showToast('未找到结果记录','warning');return}
+  const reuse=buildReusePayloadForResult(result);
+  if(!reuse||!reuse.payload){showToast('该结果暂不支持复用','warning');return}
+  const selectedNode=NM.selected&&NM.nodes[NM.selected]?NM.nodes[NM.selected]:null;
+  if(!selectedNode){showToast('请先选中一个目标节点','warning');return}
+  const targetPort=selectedNode.def.ins.find(port=>port.type===reuse.type||canConnect(reuse.type,port.type));
+  if(!targetPort){showToast('当前选中节点不接受该结果类型','warning');return}
+  const store=ensureNodeDataStore(selectedNode);
+  store.inputs[targetPort.id]=reuse.payload;
+  syncNodeInputPreview(selectedNode.id,targetPort.id,reuse.payload);
+  NM.setSummary(selectedNode.id,reuse.payload.summary||result.summary||'已接收结果');
+  showToast('结果已复用到当前节点','success');
+}
+
 const PM={
   KEY:'spritetool_wf_layout',
+  RESULTS_KEY:'spritetool_result_library',
   save(){
     const d={
-      version:3,
-      nodes:Object.values(NM.nodes).map(n=>({id:n.id,typeId:n.typeId,x:parseInt(n.el.style.left),y:parseInt(n.el.style.top),collapsed:!!n.collapsed,config:cloneValue(n.config||{})})),
+      version:4,
+      nodes:Object.values(NM.nodes).map(n=>({id:n.id,typeId:n.typeId,x:parseInt(n.el.style.left),y:parseInt(n.el.style.top),collapsed:!!n.collapsed,config:cloneValue(n.config||{}),runtime:cloneValue(n.runtime||{}),status:n.status||'idle'})),
       conns:CM.conns.map(c=>({from:c.from,fp:c.fp,to:c.to,tp:c.tp,type:c.type}))
     };
     localStorage.setItem(this.KEY,JSON.stringify(d));
+    this.saveResults();
+  },
+  saveResults(){
+    localStorage.setItem(this.RESULTS_KEY,JSON.stringify(S.resultLibrary||[]));
+  },
+  loadResults(){
+    try{const raw=JSON.parse(localStorage.getItem(this.RESULTS_KEY));S.resultLibrary=Array.isArray(raw)?raw:[]}catch{S.resultLibrary=[]}
   },
   inflate(d){
     Object.values(NM.nodes).forEach(n=>{if(n.el&&n.el.parentNode)n.el.parentNode.removeChild(n.el)});
@@ -518,6 +844,10 @@ const PM={
       NM.createNode(entry.id,entry.x,entry.y,nd);
       const node=NM.nodes[entry.id];
       node.config=cloneValue(entry.config||nd.defaultConfig||{});
+      node.runtime=cloneValue(entry.runtime||{});
+      node.status=entry.status||'idle';
+      if(node.status==='processing')node.status='idle';
+      if(node.status==='done')node.el.classList.add('done');
       node.collapsed=!!entry.collapsed;
       if(node.collapsed){node.el.querySelector('.wf-node-body').classList.add('collapsed');node.el.querySelector('.wf-node-fold').textContent='+'}
     });
@@ -528,18 +858,20 @@ const PM={
     const nodes=Object.entries(legacy.nodes).map(([id,v])=>{
       const typeId=v.typeId||(CATALOG_BY_TYPE[id]?id:null);
       if(!typeId)return null;
-      return{id,typeId,x:v.x,y:v.y,collapsed:!!v.col,config:cloneValue(CATALOG_BY_TYPE[typeId].defaultConfig||{})};
+      return{id,typeId,x:v.x,y:v.y,collapsed:!!v.col,config:cloneValue(CATALOG_BY_TYPE[typeId].defaultConfig||{}),runtime:{},status:'idle'};
     });
     if(nodes.some(n=>!n))return null;
-    return{version:3,nodes,conns:legacy.conns};
+    return{version:4,nodes,conns:legacy.conns};
   },
   load(){
+    this.loadResults();
     try{const raw=JSON.parse(localStorage.getItem(this.KEY));if(!raw)return false;
-      const d=raw.version===3?raw:this.migrateLegacyLayout(raw);if(!d)return false;
+      const d=(raw.version===4||raw.version===3)?raw:this.migrateLegacyLayout(raw);if(!d)return false;
+      if(d.version===3){d.version=4;d.nodes=d.nodes.map(n=>({...n,runtime:n.runtime||{},status:n.status||'idle'}));}
       this.inflate(d);return true;
     }catch{return false}
   },
-  reset(){localStorage.removeItem(this.KEY);location.reload()}
+  reset(){localStorage.removeItem(this.KEY);localStorage.removeItem(this.RESULTS_KEY);location.reload()}
 };
 
 // === Jimeng AI Utils ===
@@ -569,11 +901,12 @@ const NODE_RENDERERS={
 
 // === Render Functions ===
 function renderAiImage(){
-  return '<div class="hint">通过 AI 生成图片素材。需要设置 sessionid。</div>'+
-  '<div class="cg" style="flex-direction:column;align-items:stretch;gap:6px"><label>描述图片</label>'+
-  '<textarea id="d_aiPrompt" placeholder="例如：像素风格骑士，正面站立..." style="min-height:60px"></textarea></div>'+
+  return '<div class="hint">通过 AI 生成图片素材，也可接收上游图片做图生图。需要设置 sessionid。</div>'+
+  '<div id="d_aiInput" style="display:none;margin-bottom:8px;text-align:center;padding:14px;border:1px dashed var(--border);border-radius:6px"><p style="color:var(--text-muted);font-size:.78rem">等待上游输入</p></div>'+
   '<div class="cg" style="margin:6px 0"><label class="toggle-label"><input type="checkbox" id="d_aiRefToggle"><span>使用参考图</span></label></div>'+
   '<div id="d_aiRefArea" style="display:none"><div class="drop-zone" id="d_aiRefDrop" style="padding:12px;min-height:50px"><div class="drop-zone-text" style="font-size:.78rem">拖拽或 <span>点击上传</span> 参考图</div></div><input type="file" id="d_aiRefFile" accept="image/*"><div id="d_aiRefPreview" style="display:none;margin-top:4px;text-align:center"><img id="d_aiRefImg" style="max-width:160px;max-height:100px;border-radius:6px;border:1px solid var(--border)"><button class="secondary" id="d_aiRefClear" style="display:block;margin:4px auto;padding:2px 8px;font-size:.72rem">移除</button></div></div>'+
+  '<div class="cg" style="flex-direction:column;align-items:stretch;gap:6px"><label>描述图片</label>'+
+  '<textarea id="d_aiPrompt" placeholder="例如：像素风格骑士，正面站立..." style="min-height:60px"></textarea></div>'+
   '<details><summary>高级参数</summary><div><div class="cg" style="margin-bottom:6px"><label>模型</label><select id="d_aiModel"><option value="jimeng-4.5">jimeng-4.5</option><option value="jimeng-4.6">jimeng-4.6</option><option value="jimeng-5.0">jimeng-5.0</option></select></div><div class="cg" style="margin-bottom:6px"><label>比例</label><select id="d_aiRatio"><option value="1:1">1:1</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="16:9">16:9</option><option value="9:16">9:16</option></select></div><div class="cg"><label>精细度</label><input type="range" id="d_aiStrength" min="0" max="100" value="50"><span id="d_aiStrengthVal" style="font-size:.78rem;color:var(--text-dim);width:28px">0.5</span></div></div></details>'+
   '<button class="accent" id="d_aiGenBtn" style="margin-top:8px;width:100%">生成图片</button>'+
   '<div id="d_aiResults" style="margin-top:10px;min-height:60px"></div>';
@@ -622,45 +955,84 @@ function renderComposeSprite(){
   '<div class="sprite-preview" id="d_sPreview"><canvas id="d_sCanvas"></canvas><div class="sprite-info" id="d_sInfo"></div><div class="export-bar"><button class="accent" id="d_sDownPng">下载 PNG</button><button class="secondary" id="d_sDownJson">下载 JSON</button><div style="flex:1"></div><div class="cg"><label>GIF fps:</label><input type="number" id="d_sGifFps" value="12" min="1" max="60" style="width:50px"></div><button class="danger" id="d_sDownGif">导出 GIF</button></div></div>';
 }
 function renderExport(){
-  return '<div class="hint">导出精灵图为各种格式。</div>'+
-  '<div id="d_expPreview" style="text-align:center;padding:14px;border:1px dashed var(--border);border-radius:6px;margin-bottom:12px"><p style="color:var(--text-muted);font-size:.78rem">等待精灵图数据...</p></div>'+
+  return '<div class="hint">导出精灵图或图片为各种格式。</div>'+
+  '<div id="d_expPreview" style="text-align:center;padding:14px;border:1px dashed var(--border);border-radius:6px;margin-bottom:12px"><p style="color:var(--text-muted);font-size:.78rem">等待精灵图或图片数据...</p></div>'+
   '<div class="btn-group"><button class="accent primary-action" id="d_expPng">下载 PNG</button><button class="secondary" id="d_expJson">下载 JSON</button><button class="danger" id="d_expGif">导出 GIF</button></div>';
 }
 
 // === Bind Functions (scoped to node content element) ===
 function bindAiImage(node,content){
-  let aiRefData=null;
+  const runtime=ensureNodeRuntime(node);
+  let aiRefData=runtime.aiRefData||null;
   const $=s=>content.querySelector(s);
   const toggle=$('#d_aiRefToggle'),area=$('#d_aiRefArea'),drop=$('#d_aiRefDrop'),file=$('#d_aiRefFile'),prev=$('#d_aiRefPreview'),img=$('#d_aiRefImg'),clear=$('#d_aiRefClear');
-  toggle.addEventListener('change',()=>{area.style.display=toggle.checked?'block':'none';if(!toggle.checked){aiRefData=null;prev.style.display='none'}});
+  const upstreamData=CM.getInputData(node.id,'images');
+  const upstreamUrls=upstreamData&&upstreamData.urls?upstreamData.urls:[];
+  const upstreamInput=$('#d_aiInput');
+  if(node.config&&node.config.prompt!=null)$('#d_aiPrompt').value=node.config.prompt;
+  if(node.config&&node.config.model)$('#d_aiModel').value=node.config.model;
+  if(node.config&&node.config.ratio)$('#d_aiRatio').value=node.config.ratio;
+  if(node.config&&node.config.strength!=null){$('#d_aiStrength').value=node.config.strength;$('#d_aiStrengthVal').textContent=((node.config.strength||50)/100).toFixed(1)}
+  if(upstreamUrls.length){
+    upstreamInput.style.display='block';
+    upstreamInput.innerHTML=upstreamUrls.map(u=>'<img src="'+u+'" style="max-width:90px;max-height:70px;border-radius:4px;margin:2px">').join('');
+  }
+  if(runtime.useReference||aiRefData||upstreamUrls.length){
+    toggle.checked=runtime.useReference!==false;
+    area.style.display=toggle.checked?'block':'none';
+  }
+  if(aiRefData){
+    img.src=aiRefData;
+    prev.style.display='block';
+  }else if(toggle.checked&&upstreamUrls.length){
+    aiRefData=upstreamUrls[0];
+    img.src=aiRefData;
+    prev.style.display='block';
+  }
+  toggle.addEventListener('change',()=>{runtime.useReference=toggle.checked;area.style.display=toggle.checked?'block':'none';if(!toggle.checked){aiRefData=null;runtime.aiRefData=null;prev.style.display='none'}PM.save()});
   drop.addEventListener('click',()=>file.click());
   drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('dragover')});
   drop.addEventListener('dragleave',()=>drop.classList.remove('dragover'));
   drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('dragover');if(e.dataTransfer.files[0])loadRef(e.dataTransfer.files[0])});
   file.addEventListener('change',()=>{if(file.files[0])loadRef(file.files[0])});
-  clear.addEventListener('click',()=>{aiRefData=null;prev.style.display='none'});
-  function loadRef(f){const r=new FileReader();r.onload=e=>{aiRefData=e.target.result;img.src=aiRefData;prev.style.display='block'};r.readAsDataURL(f)}
-  $('#d_aiStrength').addEventListener('input',e=>{$('#d_aiStrengthVal').textContent=(e.target.value/100).toFixed(1)});
+  clear.addEventListener('click',()=>{aiRefData=null;runtime.aiRefData=null;prev.style.display='none';PM.save()});
+  function loadRef(f){const r=new FileReader();r.onload=e=>{aiRefData=e.target.result;runtime.aiRefData=aiRefData;img.src=aiRefData;prev.style.display='block';toggle.checked=true;runtime.useReference=true;area.style.display='block';PM.save()};r.readAsDataURL(f)}
+  $('#d_aiPrompt').addEventListener('input',()=>{node.config.prompt=$('#d_aiPrompt').value;PM.save()});
+  $('#d_aiModel').addEventListener('change',()=>{node.config.model=$('#d_aiModel').value;PM.save()});
+  $('#d_aiRatio').addEventListener('change',()=>{node.config.ratio=$('#d_aiRatio').value;PM.save()});
+  $('#d_aiStrength').addEventListener('input',e=>{const v=parseInt(e.target.value)||50;$('#d_aiStrengthVal').textContent=(v/100).toFixed(1);node.config.strength=v;PM.save()});
   $('#d_aiGenBtn').addEventListener('click',async()=>{
     const pr=$('#d_aiPrompt').value.trim();if(!pr){showToast('请输入描述','warning');return}
     const btn=$('#d_aiGenBtn');btn.disabled=true;btn.textContent='生成中...';
     const res=$('#d_aiResults');res.innerHTML='<div class="ai-loading"><div class="spinner"></div>生成中...</div>';
+    runtime.generatedImages=[];runtime.selectedImageIds=[];
     S.generatedImages[node.id]=[];S.selectedImages[node.id]=null;
     try{
-      const body={model:$('#d_aiModel').value,prompt:pr,ratio:$('#d_aiRatio').value,resolution:'2k',sample_strength:$('#d_aiStrength').value/100,response_format:'url'};
-      if(aiRefData&&toggle.checked)body.images=[aiRefData];
+      const body={model:$('#d_aiModel').value,prompt:pr,ratio:$('#d_aiRatio').value,resolution:'2k',sample_strength:($('#d_aiStrength').value/100),response_format:'url'};
+      const inputImages=[];
+      if(aiRefData&&toggle.checked)inputImages.push(aiRefData);
+      else if(upstreamUrls.length&&toggle.checked)inputImages.push(upstreamUrls[0]);
+      if(inputImages.length)body.images=inputImages;
       const data=await fetchJimengAPI('images/generations',{method:'POST',body:JSON.stringify(body)});
       const imgs=(data.data||[]).filter(d=>d.url);if(!imgs.length)throw new Error('未生成图片');
-      S.generatedImages[node.id]=imgs.map((im,i)=>({id:i,url:im.url,selected:false}));
-      renderAiResults(res,node.id);NM.setStatus(node.id,'done');NM.setSummary(node.id,imgs.length+' 张图片');CM.pushData(node.id,'images',{urls:imgs.map(i=>i.url),summary:imgs.length+' 张图片'});
+      const resultUrls=imgs.map(im=>im.url);
+      runtime.generatedImages=resultUrls.map((url,i)=>({id:i,url,selected:false}));
+      S.generatedImages[node.id]=cloneValue(runtime.generatedImages);
+      renderAiResults(res,node.id);
+      NM.setStatus(node.id,'done');NM.setSummary(node.id,imgs.length+' 张图片');
+      CM.pushData(node.id,'images',{urls:resultUrls,summary:imgs.length+' 张图片'});
+      await recordResult('image',node,{urls:resultUrls,summary:imgs.length+' 张图片'},imgs.length+' 张图片',{prompt:pr,previewUrl:resultUrls[0]||''});
+      PM.save();
       showToast('已生成 '+imgs.length+' 张','success');
     }catch(e){res.innerHTML='<p style="color:var(--danger);text-align:center;padding:12px;font-size:.82rem">失败: '+e.message+'</p>';showToast('失败: '+e.message,'error')}
     finally{btn.disabled=false;btn.textContent='生成图片'}
   });
-  if(S.generatedImages[node.id]&&S.generatedImages[node.id].length){renderAiResults($('#d_aiResults'),node.id)}
+  if(runtime.generatedImages&&runtime.generatedImages.length){S.generatedImages[node.id]=cloneValue(runtime.generatedImages);renderAiResults($('#d_aiResults'),node.id)}
 }
 function renderAiResults(container,nodeId){
-  const imgs=S.generatedImages[nodeId]||[];
+  const node=NM.nodes[nodeId];
+  const runtime=node?ensureNodeRuntime(node):{};
+  const imgs=(runtime.generatedImages&&runtime.generatedImages.length)?runtime.generatedImages:(S.generatedImages[nodeId]||[]);
   if(!imgs.length){container.innerHTML='<p style="color:var(--text-muted);text-align:center;padding:20px 0;font-size:.78rem">暂无结果</p>';return}
   container.innerHTML='<div class="ai-results-grid">'+imgs.map(im=>
     '<div class="ai-result-item'+(im.selected?' selected':'')+'" data-aiid="'+im.id+'"><img src="'+im.url+'" loading="lazy"><div class="arc"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg></div></div>'
@@ -669,9 +1041,13 @@ function renderAiResults(container,nodeId){
     el.addEventListener('click',()=>{
       const id=parseInt(el.dataset.aiid);const im=imgs.find(i=>i.id===id);
       if(im){im.selected=!im.selected;el.classList.toggle('selected',im.selected);
+        runtime.generatedImages=imgs;
+        runtime.selectedImageIds=imgs.filter(i=>i.selected).map(i=>i.id);
+        S.generatedImages[nodeId]=cloneValue(imgs);
         S.selectedImages[nodeId]=imgs.find(i=>i.selected)||null;
         if(S.selectedImages[nodeId]){CM.pushData(nodeId,'images',{urls:[S.selectedImages[nodeId].url],summary:'已选图片'})}
         else{CM.pushData(nodeId,'images',{urls:imgs.map(i=>i.url),summary:imgs.length+' 张图片'})}
+        PM.save();
       }
     });
   });
@@ -679,35 +1055,52 @@ function renderAiResults(container,nodeId){
 
 // --- AI Video ---
 function bindAiVideo(node,content){
-  let vfFirstUrl=null,vfPollAbort=null;
+  const runtime=ensureNodeRuntime(node);
+  let manualFirstUrl=runtime.manualFirstUrl||null,vfPollAbort=null;
   const $=s=>content.querySelector(s);
   const frameDiv=$('#d_vfFrame'),fileIn=$('#d_vfFile');
-  const upData=CM.getInputData(node.id,'image');
-  if(upData){
-    vfFirstUrl=upData.url||(upData.urls&&upData.urls[0])||null;
-    if(vfFirstUrl)frameDiv.innerHTML='<img src="'+vfFirstUrl+'" style="max-width:100%;max-height:150px;border-radius:6px">'
-  }
+  const upstreamData=CM.getInputData(node.id,'image');
+  const upstreamFirstUrl=getPrimaryDataUrl(upstreamData);
+  if(node.config&&node.config.prompt!=null)$('#d_vfPrompt').value=node.config.prompt;
+  if(node.config&&node.config.model)$('#d_vfModel').value=node.config.model;
+  if(node.config&&node.config.duration)$('#d_vfDur').value=node.config.duration;
+  if(node.config&&node.config.ratio)$('#d_vfRatio').value=node.config.ratio;
+  const initialFrameUrl=manualFirstUrl||upstreamFirstUrl;
+  if(initialFrameUrl)frameDiv.innerHTML='<img src="'+initialFrameUrl+'" style="max-width:100%;max-height:150px;border-radius:6px">';
+  $('#d_vfPrompt').addEventListener('input',()=>{node.config.prompt=$('#d_vfPrompt').value;PM.save()});
+  $('#d_vfModel').addEventListener('change',()=>{node.config.model=$('#d_vfModel').value;PM.save()});
+  $('#d_vfDur').addEventListener('change',()=>{node.config.duration=Number($('#d_vfDur').value);PM.save()});
+  $('#d_vfRatio').addEventListener('change',()=>{node.config.ratio=$('#d_vfRatio').value;PM.save()});
   $('#d_vfUpload').addEventListener('click',()=>fileIn.click());
-  fileIn.addEventListener('change',()=>{const f=fileIn.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{vfFirstUrl=e.target.result;frameDiv.innerHTML='<img src="'+vfFirstUrl+'" style="max-width:100%;max-height:150px;border-radius:6px">'};r.readAsDataURL(f)});
+  fileIn.addEventListener('change',()=>{const f=fileIn.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{manualFirstUrl=e.target.result;runtime.manualFirstUrl=manualFirstUrl;frameDiv.innerHTML='<img src="'+manualFirstUrl+'" style="max-width:100%;max-height:150px;border-radius:6px">';PM.save()};r.readAsDataURL(f)});
   $('#d_vfGenBtn').addEventListener('click',async()=>{
+    const currentInput=CM.getInputData(node.id,'image');
+    const vfFirstUrl=manualFirstUrl||getPrimaryDataUrl(currentInput);
     if(!vfFirstUrl){showToast('请设置首帧','warning');return}
     const btn=$('#d_vfGenBtn');btn.disabled=true;btn.textContent='生成中...';
     const res=$('#d_vfResult');res.innerHTML='<div class="ai-loading"><div class="spinner"></div>生成中...</div>';
     NM.setStatus(node.id,'processing');
     try{
-      const body={model:$('#d_vfModel').value,prompt:$('#d_vfPrompt').value.trim()||'缓慢动画',file_paths:[vfFirstUrl],duration:parseInt($('#d_vfDur').value),ratio:$('#d_vfRatio').value,resolution:'720p'};
+      const prompt=$('#d_vfPrompt').value.trim()||'缓慢动画';
+      const body={model:$('#d_vfModel').value,prompt,duration:parseInt($('#d_vfDur').value),ratio:$('#d_vfRatio').value,resolution:'720p',file_paths:[vfFirstUrl]};
       const sub=await fetchJimengAPI('videos/generations/async',{method:'POST',body:JSON.stringify(body)});
       const tid=sub.task_id;if(!tid)throw new Error('未获取到任务 ID');
       vfPollAbort={cancelled:false};
       res.innerHTML='<div class="ai-loading"><div class="spinner"></div>排队中...<br><button class="secondary" id="d_vfCancel" style="margin-top:6px">取消</button></div>';
       $('#d_vfCancel')&&$('#d_vfCancel').addEventListener('click',()=>{vfPollAbort.cancelled=true});
-      const result=await pollVideoTask(tid,res,vfPollAbort);S.generatedVideo=result.url;
-      renderVideoResult(res,result,node.id);NM.setStatus(node.id,'done');NM.setSummary(node.id,'视频已就绪');
-      CM.pushData(node.id,'video',{url:result.url,summary:'视频已就绪'});showToast('视频生成完成','success');
+      const result=await pollVideoTask(tid,res,vfPollAbort);
+      runtime.generatedVideoUrl=result.url;
+      S.generatedVideo=result.url;
+      renderVideoResult(res,result,node.id);
+      NM.setStatus(node.id,'done');NM.setSummary(node.id,'视频已就绪');
+      CM.pushData(node.id,'video',{url:result.url,summary:'视频已就绪'});
+      await recordResult('video',node,{url:result.url,summary:'视频已就绪'},'视频已就绪',{prompt,previewUrl:buildVideoSourceUrl(result.url)});
+      PM.save();
+      showToast('视频生成完成','success');
     }catch(e){res.innerHTML='<p style="color:var(--danger);text-align:center;padding:12px;font-size:.82rem">失败: '+e.message+'</p>';NM.setStatus(node.id,'idle');showToast('失败: '+e.message,'error')}
     finally{btn.disabled=false;btn.textContent='生成视频'}
   });
-  if(S.generatedVideo){renderVideoResult($('#d_vfResult'),{url:S.generatedVideo},node.id)}
+  if(runtime.generatedVideoUrl){renderVideoResult($('#d_vfResult'),{url:runtime.generatedVideoUrl},node.id)}
 }
 async function pollVideoTask(tid,res,abort){
   for(let i=0;i<120;i++){
@@ -719,20 +1112,33 @@ async function pollVideoTask(tid,res,abort){
   }throw new Error('超时');
 }
 function renderVideoResult(container,result,nodeId){
-  const proxySrc='/api/jimeng/video-download?url='+encodeURIComponent(result.url);
+  const proxySrc=buildVideoSourceUrl(result.url);
   container.innerHTML='<div style="text-align:center"><video controls autoplay loop style="max-width:100%;max-height:240px;border-radius:8px" src="'+proxySrc+'"></video><div style="margin-top:8px;display:flex;gap:6px;justify-content:center"><button class="accent" id="d_vfDown">下载</button><button class="success" id="d_vfUse">使用此视频</button></div></div>';
   container.querySelector('#d_vfDown').addEventListener('click',()=>downloadVideoViaProxy(result.url));
   container.querySelector('#d_vfUse').addEventListener('click',()=>useAiVideo(result.url,nodeId));
 }
-async function downloadVideoViaProxy(url){showToast('下载中...','info');try{const r=await fetch('/api/jimeng/video-download?url='+encodeURIComponent(url));if(!r.ok)throw new Error('下载失败');const b=await r.blob();const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='ai-video.mp4';a.click();URL.revokeObjectURL(u);showToast('下载完成','success')}catch(e){showToast('下载失败: '+e.message,'error')}}
+async function downloadVideoViaProxy(url){showToast('下载中...','info');try{const proxySrc=buildVideoSourceUrl(url);const a=document.createElement('a');a.href=proxySrc;a.download='ai-video.mp4';a.target='_blank';document.body.appendChild(a);a.click();a.remove();showToast('已触发下载','success')}catch(e){showToast('下载失败: '+e.message,'error')}}
 async function useAiVideo(url,aiVideoNodeId){
-  showToast('加载中...','info');
-  try{const r=await fetch('/api/jimeng/video-download?url='+encodeURIComponent(url));if(!r.ok)throw new Error('加载失败');const b=await r.blob();const u=URL.createObjectURL(b);
+  showToast('正在传递到导入视频节点...','info');
+  try{const proxySrc=buildVideoSourceUrl(url);
     const downstream=CM.getDownstream(aiVideoNodeId,'video');
-    for(const conn of downstream){loadVideoBlob(conn.to,u,'AI 生成视频')}
-    showToast('视频已导入','success');
-  }catch(e){showToast('加载失败: '+e.message,'error')}
+    if(!downstream.length){showToast('没有连接到导入视频节点','warning');return}
+    for(const conn of downstream){
+      const targetNode=NM.nodes[conn.to];
+      if(!targetNode)continue;
+      const payload={url:proxySrc,summary:'AI 生成视频'};
+      const store=ensureNodeDataStore(targetNode);
+      store.inputs[conn.tp]=payload;
+      NM.setSummary(conn.to,payload.summary);
+      if(targetNode.typeId==='importVideo'){
+        if(targetNode.expanded&&targetNode.contentEl)loadVideoBlob(conn.to,proxySrc,'AI 生成视频');
+        else S.pendingVideos[conn.to]={blobUrl:proxySrc,name:'AI 生成视频'};
+      }
+    }
+    showToast('视频已传递','success');
+  }catch(e){showToast('传递失败: '+e.message,'error')}
 }
+
 
 // --- Import Video ---
 function bindImportVideo(node,content){
@@ -763,7 +1169,8 @@ async function loadVideoBlob(nodeId,u,name){
   if(u&&typeof u==='string'&&!u.startsWith('blob:')&&!u.startsWith('data:')){
     try{
       showToast('正在下载视频...','info');
-      const r=await fetch('/api/jimeng/video-download?url='+encodeURIComponent(u));
+      const requestUrl=buildVideoSourceUrl(u);
+      const r=await fetch(requestUrl);
       if(!r.ok)throw new Error('HTTP '+r.status);
       const b=await r.blob();
       actualUrl=URL.createObjectURL(b);
@@ -793,99 +1200,119 @@ async function extractFrames(importNodeId,content){
   for(let i=0;i<total;i++){v.currentTime=i/fps;await new Promise(r=>{v.onseeked=()=>{ctx.drawImage(v,0,0);S.frames.push({id:i,dataUrl:c.toDataURL('image/png'),_w:c.width,_h:c.height,selected:true});updateProgress((i+1)/total*100);r()}});
   }
   hideProgress();
+  const framesData={frames:S.frames,summary:total+' 帧'};
   const downstream=CM.getDownstream(importNodeId,'video');
   for(const conn of downstream){
     const sfNode=NM.nodes[conn.to];if(!sfNode)continue;
-    if(sfNode.expanded&&sfNode.contentEl){renderFrameGrid(sfNode.contentEl)}
+    if(sfNode.expanded&&sfNode.contentEl&&sfNode.typeId==='selectFrames'){const syncFrames=()=>CM.pushData(conn.to,'frames',getSelectedFramePayload(S.frames));renderFrameGrid(sfNode.contentEl,S.frames,syncFrames)}
     NM.setStatus(conn.to,'done');NM.setSummary(conn.to,total+' 帧');
-    CM.pushData(conn.to,'frames',{frames:S.frames,summary:total+' 帧'});
   }
+  CM.pushData(importNodeId,'video',CM.getOutputData(importNodeId,'video')||{blobUrl:v.src,summary:'视频已加载'});
+  CM.pushData(importNodeId,'frames',framesData);
+  const selectFrameTargets=CM.getDownstream(importNodeId,'video').filter(conn=>NM.nodes[conn.to]&&NM.nodes[conn.to].typeId==='selectFrames');
+  selectFrameTargets.forEach(conn=>CM.pushData(conn.to,'frames',framesData));
   showToast('提取 '+total+' 帧','success');
 }
-function renderFrameGrid(content){
+function renderFrameGrid(content,frames,onChange){
   const grid=content.querySelector('#d_framesGrid');if(!grid)return;grid.innerHTML='';
-  S.frames.forEach((f,idx)=>{
+  frames.forEach((f,idx)=>{
     const el=document.createElement('div');el.className='frame-item'+(f.selected?' selected':'');
     el.innerHTML='<div class="ci"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><img src="'+f.dataUrl+'"><div class="frame-number">#'+(idx+1)+'</div>';
     el.addEventListener('click',e=>{
-      if(e.shiftKey&&S.lastClickedFrame>=0){const from=Math.min(S.lastClickedFrame,idx),to=Math.max(S.lastClickedFrame,idx);const nv=!f.selected;for(let i=from;i<=to;i++)S.frames[i].selected=nv}
+      if(e.shiftKey&&S.lastClickedFrame>=0){const from=Math.min(S.lastClickedFrame,idx),to=Math.max(S.lastClickedFrame,idx);const nv=!f.selected;for(let i=from;i<=to;i++)frames[i].selected=nv}
       else f.selected=!f.selected;
-      S.lastClickedFrame=idx;renderFrameGrid(content);updateFrameCount(content);
+      S.lastClickedFrame=idx;renderFrameGrid(content,frames,onChange);updateFrameCount(content,frames);if(onChange)onChange(frames);
     });
     grid.appendChild(el);
   });
-  updateFrameCount(content);
+  updateFrameCount(content,frames);
 }
-function updateFrameCount(content){
+function updateFrameCount(content,frames){
   const t=content.querySelector('#d_totalF'),s=content.querySelector('#d_selF');
-  if(t)t.textContent=S.frames.length;if(s)s.textContent=S.frames.filter(f=>f.selected).length;
+  if(t)t.textContent=frames.length;if(s)s.textContent=getSelectedFrames(frames).length;
 }
 
 // --- Select Frames ---
 function bindSelectFrames(node,content){
   const $=s=>content.querySelector(s);
-  if(S.frames.length)renderFrameGrid(content);
-  $('#d_selAll').addEventListener('click',()=>{S.frames.forEach(f=>f.selected=true);renderFrameGrid(content)});
-  $('#d_deselAll').addEventListener('click',()=>{S.frames.forEach(f=>f.selected=false);renderFrameGrid(content)});
-  $('#d_invSel').addEventListener('click',()=>{S.frames.forEach(f=>f.selected=!f.selected);renderFrameGrid(content)});
+  const syncFrames=()=>{const frames=getNodeFrameSource(node);CM.pushData(node.id,'frames',getSelectedFramePayload(frames))};
+  const renderCurrentFrames=()=>{const frames=getNodeFrameSource(node);if(frames.length)renderFrameGrid(content,frames,syncFrames)};
+  renderCurrentFrames();
+  $('#d_selAll').addEventListener('click',()=>{const frames=getNodeFrameSource(node);frames.forEach(f=>f.selected=true);renderFrameGrid(content,frames,syncFrames);syncFrames()});
+  $('#d_deselAll').addEventListener('click',()=>{const frames=getNodeFrameSource(node);frames.forEach(f=>f.selected=false);renderFrameGrid(content,frames,syncFrames);syncFrames()});
+  $('#d_invSel').addEventListener('click',()=>{const frames=getNodeFrameSource(node);frames.forEach(f=>f.selected=!f.selected);renderFrameGrid(content,frames,syncFrames);syncFrames()});
 }
 
 // --- Direct Sprite ---
 function bindDirectSprite(node,content){
+  const runtime=ensureNodeRuntime(node);
   const $=s=>content.querySelector(s);
   bindPresetBtns(content,'[data-dw]','#d_dW',autoDH);
   bindConfigValue(node,content,'#d_dW','width',{readValue:()=>Number($('#d_dW').value),eventName:'change'});
   bindConfigValue(node,content,'#d_dCols','cols',{readValue:()=>Number($('#d_dCols').value),eventName:'change'});
   bindConfigValue(node,content,'#d_dGifFps','gifFps',{readValue:()=>Number($('#d_dGifFps').value),eventName:'change'});
   $('#d_dW').addEventListener('input',autoDH);
-  function autoDH(){const w=parseInt($('#d_dW').value)||512;const fs=S.frames.filter(f=>f.selected);if(fs.length&&fs[0]._w){$('#d_dH').value=Math.round(w/fs[0]._w*fs[0]._h)}}
-  if(S.directSpriteData){
-    const cv=$('#d_dCanvas');const img=new Image();img.onload=()=>{
-      cv.width=img.width;cv.height=img.height;cv.getContext('2d').drawImage(img,0,0);
-      $('#d_dPreview').style.display='block';
-      $('#d_dInfo').innerHTML='尺寸 <strong>'+img.width+'x'+img.height+'</strong> | 帧数 <strong>'+S.directSpriteData.frames.length+'</strong>';
-    };img.src=S.directSpriteData.image;
+  function autoDH(){const w=parseInt($('#d_dW').value)||512;const fs=getSelectedFrames(getNodeFrameInput(node));if(fs.length&&fs[0]._w){$('#d_dH').value=Math.round(w/fs[0]._w*fs[0]._h)}}
+  const spriteState=runtime.directSpriteData||S.directSpriteData;
+  if(spriteState){
+    const cv=$('#d_dCanvas');const img=new Image();img.onload=()=>{cv.width=img.width;cv.height=img.height;cv.getContext('2d').drawImage(img,0,0);$('#d_dPreview').style.display='block';$('#d_dInfo').innerHTML='尺寸 <strong>'+img.width+'x'+img.height+'</strong> | 帧数 <strong>'+spriteState.frames.length+'</strong>';};img.src=spriteState.image;
   }
   $('#d_dGenBtn').addEventListener('click',()=>{
-    const fs=S.frames.filter(f=>f.selected);if(!fs.length)return;
+    const fs=getSelectedFrames(getNodeFrameInput(node));if(!fs.length)return;
     const w=parseInt($('#d_dW').value),h=parseInt($('#d_dH').value),cols=parseInt($('#d_dCols').value),rows=Math.ceil(fs.length/cols);
     const cv=$('#d_dCanvas');cv.width=w*cols;cv.height=h*rows;const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);
     let loaded=0;const fd=[];
     fs.forEach((f,i)=>{const img=new Image();img.onload=()=>{const c=i%cols,r=Math.floor(i/cols);const sc=Math.min(w/img.width,h/img.height);ctx.drawImage(img,c*w+(w-img.width*sc)/2,r*h+(h-img.height*sc)/2,img.width*sc,img.height*sc);
       fd.push({index:i,name:'frame_'+i,x:c*w,y:r*h,width:w,height:h,originalWidth:img.width,originalHeight:img.height});
       loaded++;if(loaded===fs.length){$('#d_dPreview').style.display='block';$('#d_dInfo').innerHTML='尺寸 <strong>'+cv.width+'x'+cv.height+'</strong> | 帧数 <strong>'+fs.length+'</strong> | <strong>'+cols+'x'+rows+'</strong>';
-        S.directSpriteData={image:cv.toDataURL('image/png'),frames:fd,meta:{version:'1.0',format:'RGBA8888',size:{w:cv.width,h:cv.height},scale:1}};
+        runtime.directSpriteData={image:cv.toDataURL('image/png'),frames:fd,meta:{version:'1.0',format:'RGBA8888',size:{w:cv.width,h:cv.height},scale:1}};
+        S.directSpriteData=runtime.directSpriteData;
         NM.setStatus(node.id,'done');NM.setSummary(node.id,fs.length+'帧精灵图');
-        CM.pushData(node.id,'sprite',{dataUrl:S.directSpriteData.image,summary:fs.length+'帧精灵图',frames:S.directSpriteData.frames,meta:S.directSpriteData.meta});showToast('精灵图完成','success')}
-    };img.src=f.dataUrl});
+        const payload={dataUrl:runtime.directSpriteData.image,summary:fs.length+'帧精灵图',frames:runtime.directSpriteData.frames,sourceFrames:fs,meta:runtime.directSpriteData.meta};
+        CM.pushData(node.id,'sprite',payload);
+        recordResult('sprite',node,payload,fs.length+'帧精灵图',{previewUrl:runtime.directSpriteData.image});
+        PM.save();
+        showToast('精灵图完成','success')}};img.src=f.dataUrl});
   });
-  $('#d_dDownPng').addEventListener('click',()=>{if(!S.directSpriteData)return;const a=document.createElement('a');a.download='sprite.png';a.href=S.directSpriteData.image;a.click()});
-  $('#d_dDownJson').addEventListener('click',()=>{if(!S.directSpriteData)return;const j={frames:{},meta:S.directSpriteData.meta};S.directSpriteData.frames.forEach(f=>{j.frames[f.name]={frame:{x:f.x,y:f.y,w:f.width,h:f.height},rotated:false,trimmed:false,spriteSourceSize:{x:0,y:0,w:f.width,h:f.height},sourceSize:{w:f.width,h:f.height}}});dl(JSON.stringify(j,null,2),'sprite.json','application/json')});
-  $('#d_dDownGif').addEventListener('click',()=>{const fs=S.frames.filter(f=>f.selected);if(!fs.length)return;exportGif(fs,parseInt($('#d_dW').value)||512,parseInt($('#d_dH').value)||512,parseInt($('#d_dGifFps').value)||12,false,content)});
+  $('#d_dDownPng').addEventListener('click',()=>{if(!runtime.directSpriteData)return;const a=document.createElement('a');a.download='sprite.png';a.href=runtime.directSpriteData.image;a.click()});
+  $('#d_dDownJson').addEventListener('click',()=>{if(!runtime.directSpriteData)return;const j={frames:{},meta:runtime.directSpriteData.meta};runtime.directSpriteData.frames.forEach(f=>{j.frames[f.name]={frame:{x:f.x,y:f.y,w:f.width,h:f.height},rotated:false,trimmed:false,spriteSourceSize:{x:0,y:0,w:f.width,h:f.height},sourceSize:{w:f.width,h:f.height}}});dl(JSON.stringify(j,null,2),'sprite.json','application/json')});
+  $('#d_dDownGif').addEventListener('click',()=>{const fs=getSelectedFrames(getNodeFrameInput(node));if(!fs.length)return;exportGif(fs,parseInt($('#d_dW').value)||512,parseInt($('#d_dH').value)||512,parseInt($('#d_dGifFps').value)||12,false,content,node)});
 }
 
 // --- Image to Image ---
 function bindImg2Img(node,content){
+  const runtime=ensureNodeRuntime(node);
   const $=s=>content.querySelector(s);
-  const upData=CM.getInputData(node.id,'images');
-  const cachedImg2Img=S.img2imgResults[node.id]||null;
-  if(upData&&upData.urls){const urls=upData.urls||[];if(urls.length){$('#d_i2iInput').innerHTML=urls.map(u=>'<img src="'+u+'" style="max-width:90px;max-height:70px;border-radius:4px;margin:2px">').join('')}}
+  const cachedImg2Img=runtime.img2imgResults||S.img2imgResults[node.id]||null;
+  const initialInput=CM.getInputData(node.id,'images');
+  if(node.config&&node.config.prompt!=null)$('#d_i2iPrompt').value=node.config.prompt;
+  if(node.config&&node.config.model)$('#d_i2iModel').value=node.config.model;
+  if(node.config&&node.config.strength!=null){$('#d_i2iStr').value=node.config.strength;$('#d_i2iStrVal').textContent=((node.config.strength||50)/100).toFixed(1)}
+  if(initialInput&&initialInput.urls){const urls=initialInput.urls||[];if(urls.length){$('#d_i2iInput').innerHTML=urls.map(u=>'<img src="'+u+'" style="max-width:90px;max-height:70px;border-radius:4px;margin:2px">').join('')}}
   if(cachedImg2Img&&cachedImg2Img.length){$('#d_i2iResults').innerHTML='<div class="ai-results-grid">'+cachedImg2Img.map((im,i)=>'<div class="ai-result-item" data-aiid="'+i+'"><img src="'+im.url+'"></div>').join('')+'</div>'}
-  $('#d_i2iStr').addEventListener('input',e=>{$('#d_i2iStrVal').textContent=(e.target.value/100).toFixed(1)});
+  $('#d_i2iPrompt').addEventListener('input',()=>{node.config.prompt=$('#d_i2iPrompt').value;PM.save()});
+  $('#d_i2iModel').addEventListener('change',()=>{node.config.model=$('#d_i2iModel').value;PM.save()});
+  $('#d_i2iStr').addEventListener('input',e=>{const v=parseInt(e.target.value)||50;$('#d_i2iStrVal').textContent=(v/100).toFixed(1);node.config.strength=v;PM.save()});
   $('#d_i2iGenBtn').addEventListener('click',async()=>{
     const pr=$('#d_i2iPrompt').value.trim();if(!pr){showToast('请输入描述','warning');return}
     const btn=$('#d_i2iGenBtn');btn.disabled=true;btn.textContent='生成中...';
     const res=$('#d_i2iResults');res.innerHTML='<div class="ai-loading"><div class="spinner"></div>生成中...</div>';
     NM.setStatus(node.id,'processing');
     try{
+      const upData=CM.getInputData(node.id,'images');
       const inputUrls=upData&&upData.urls?upData.urls||[]:[];
       const body={model:$('#d_i2iModel').value,prompt:pr,images:inputUrls.slice(0,1),sample_strength:$('#d_i2iStr').value/100,response_format:'url'};
       const data=await fetchJimengAPI('images/generations',{method:'POST',body:JSON.stringify(body)});
       const imgs=(data.data||[]).filter(d=>d.url);if(!imgs.length)throw new Error('未生成图片');
-      S.img2imgResults[node.id]=imgs.map(im=>({url:im.url}));
-      res.innerHTML='<div class="ai-results-grid">'+imgs.map((im,i)=>'<div class="ai-result-item" data-aiid="'+i+'"><img src="'+im.url+'"></div>').join('')+'</div>';
+      const resultUrls=imgs.map(i=>i.url);
+      runtime.img2imgResults=resultUrls.map(url=>({url}));
+      S.img2imgResults[node.id]=cloneValue(runtime.img2imgResults);
+      res.innerHTML='<div class="ai-results-grid">'+resultUrls.map((url,i)=>'<div class="ai-result-item" data-aiid="'+i+'"><img src="'+url+'"></div>').join('')+'</div>';
       NM.setStatus(node.id,'done');NM.setSummary(node.id,imgs.length+' 张');
-      CM.pushData(node.id,'images_out',{urls:imgs.map(i=>i.url),summary:imgs.length+' 张'});showToast('已生成 '+imgs.length+' 张','success');
+      CM.pushData(node.id,'images_out',{urls:resultUrls,sourceFrames:upData&&upData.sourceFrames?upData.sourceFrames:null,spriteFrames:upData&&upData.spriteFrames?upData.spriteFrames:null,meta:upData&&upData.meta?upData.meta:null,summary:imgs.length+' 张'});
+      await recordResult('image',node,{urls:resultUrls,summary:imgs.length+' 张'},imgs.length+' 张',{prompt:pr,previewUrl:resultUrls[0]||''});
+      PM.save();
+      showToast('已生成 '+imgs.length+' 张','success');
     }catch(e){res.innerHTML='<p style="color:var(--danger);text-align:center;padding:12px;font-size:.82rem">失败: '+e.message+'</p>';showToast('失败: '+e.message,'error')}
     finally{btn.disabled=false;btn.textContent='生成'}
   });
@@ -904,6 +1331,7 @@ function renderAiThumbGrid(node,content){
 function bindRemoveBg(node,content){
   const $=s=>content.querySelector(s);
   const config=ensureNodeConfig(node);const runtime=ensureNodeRuntime(node);
+  const getCurrentInputFrames=()=>resolveImageInputFrames(node);
   S.tolerance=config.tolerance??S.tolerance;S.feather=config.feather??S.feather;
   $('#toleranceSlider').value=S.tolerance;$('#toleranceValue').textContent=S.tolerance;
   $('#featherSlider').value=S.feather;$('#featherValue').textContent=S.feather;
@@ -914,7 +1342,7 @@ function bindRemoveBg(node,content){
   renderAiThumbGrid(node,content);
   // AI remove bg
   content.querySelector('#d_bgAiStart')&&content.querySelector('#d_bgAiStart').addEventListener('click',async()=>{
-    const fs=S.frames.filter(f=>f.selected);if(!fs.length){showToast('请先选择帧','warning');return}
+    const fs=await getCurrentInputFrames();if(!fs.length){showToast('请先选择帧','warning');return}
     NM.setStatus(node.id,'processing');
     runtime.aiThumbs=[];runtime.processedFrames=[];renderAiThumbGrid(node,content);
     try{const lib=await loadAiLib();
@@ -922,7 +1350,7 @@ function bindRemoveBg(node,content){
       for(let i=0;i<fs.length;i++){
         const blob=await (await fetch(fs[i].dataUrl)).blob();const rb=await lib.removeBackground(blob);const url=URL.createObjectURL(rb);
         const img=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=url});
-        runtime.processedFrames.push({id:fs[i].id,dataUrl:url,_w:img.width,_h:img.height});
+        runtime.processedFrames.push({id:fs[i].id,dataUrl:url,_w:img.width,_h:img.height,selected:true});
         runtime.aiThumbs.push({index:i+1,url});
         S.processedFrames=runtime.processedFrames;
         $('#d_bgAiFill').style.width=(i+1)/fs.length*100+'%';$('#d_bgAiProgTxt').textContent=(i+1)+'/'+fs.length;
@@ -936,8 +1364,7 @@ function bindRemoveBg(node,content){
   });
   // Color remove bg
   const cv=$('#pickerCanvas'),ctx=cv.getContext('2d'),cur=$('#pickerCursor');
-  const fs=S.frames.filter(f=>f.selected);
-  if(fs.length){const img=new Image();img.onload=()=>{cv.width=img.width;cv.height=img.height;ctx.drawImage(img,0,0)};img.src=fs[0].dataUrl}
+  getCurrentInputFrames().then(initialFrames=>{if(initialFrames.length){const img=new Image();img.onload=()=>{cv.width=img.width;cv.height=img.height;ctx.drawImage(img,0,0)};img.src=initialFrames[0].dataUrl}}).catch(()=>{});
   cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();const x=Math.floor((e.clientX-r.left)*(cv.width/r.width)),y=Math.floor((e.clientY-r.top)*(cv.height/r.height));
     cur.style.display='block';cur.style.left=(e.clientX-r.left)+'px';cur.style.top=(e.clientY-r.top)+'px';
     if(x>=0&&x<cv.width&&y>=0&&y<cv.height){const px=ctx.getImageData(x,y,1,1).data;const hex=rgbHex(px[0],px[1],px[2]);$('#pickerPreviewColor').style.background=hex;$('#pickerPreviewHex').textContent=hex}});
@@ -945,10 +1372,11 @@ function bindRemoveBg(node,content){
   cv.addEventListener('click',e=>{const r=cv.getBoundingClientRect();const x=Math.floor((e.clientX-r.left)*(cv.width/r.width)),y=Math.floor((e.clientY-r.top)*(cv.height/r.height));const px=ctx.getImageData(x,y,1,1).data;S.selectedColor={r:px[0],g:px[1],b:px[2]};const hex=rgbHex(px[0],px[1],px[2]);$('#colorBox').style.background=hex;$('#colorValue').textContent=hex});
   $('#toleranceSlider').addEventListener('input',e=>{S.tolerance=parseInt(e.target.value);config.tolerance=S.tolerance;$('#toleranceValue').textContent=S.tolerance;PM.save()});
   $('#featherSlider').addEventListener('input',e=>{S.feather=parseInt(e.target.value);config.feather=S.feather;$('#featherValue').textContent=S.feather;PM.save()});
-  $('#previewRemoveBtn').addEventListener('click',()=>{if(!S.selectedColor){showToast('先选背景色','warning');return}const fs2=S.frames.filter(f=>f.selected);const img=new Image();img.onload=()=>{const tc=document.createElement('canvas');tc.width=img.width;tc.height=img.height;tc.getContext('2d').drawImage(img,0,0);const res=removeBg(tc,S.selectedColor,S.tolerance,S.feather);cv.width=res.width;cv.height=res.height;ctx.drawImage(res,0,0)};img.src=fs2[0].dataUrl});
-  $('#batchRemoveBtn').addEventListener('click',async()=>{if(!S.selectedColor){showToast('先选背景色','warning');return}const fs2=S.frames.filter(f=>f.selected);showProgress('批量抠图...');S.processedFrames=[];NM.setStatus(node.id,'processing');
-    for(let i=0;i<fs2.length;i++){await new Promise(r=>{const img=new Image();img.onload=()=>{const tc=document.createElement('canvas');tc.width=img.width;tc.height=img.height;tc.getContext('2d').drawImage(img,0,0);const res=removeBg(tc,S.selectedColor,S.tolerance,S.feather);S.processedFrames.push({id:fs2[i].id,dataUrl:res.toDataURL('image/png'),_w:res.width,_h:res.height});updateProgress((i+1)/fs2.length*100);r()};img.src=fs2[i].dataUrl})}
+  $('#previewRemoveBtn').addEventListener('click',async()=>{if(!S.selectedColor){showToast('先选背景色','warning');return}const fs2=await getCurrentInputFrames();if(!fs2.length)return;const img=new Image();img.onload=()=>{const tc=document.createElement('canvas');tc.width=img.width;tc.height=img.height;tc.getContext('2d').drawImage(img,0,0);const res=removeBg(tc,S.selectedColor,S.tolerance,S.feather);cv.width=res.width;cv.height=res.height;ctx.drawImage(res,0,0)};img.src=fs2[0].dataUrl});
+  $('#batchRemoveBtn').addEventListener('click',async()=>{if(!S.selectedColor){showToast('先选背景色','warning');return}const fs2=await getCurrentInputFrames();if(!fs2.length)return;showProgress('批量抠图...');S.processedFrames=[];NM.setStatus(node.id,'processing');
+    for(let i=0;i<fs2.length;i++){await new Promise(r=>{const img=new Image();img.onload=()=>{const tc=document.createElement('canvas');tc.width=img.width;tc.height=img.height;tc.getContext('2d').drawImage(img,0,0);const res=removeBg(tc,S.selectedColor,S.tolerance,S.feather);S.processedFrames.push({id:fs2[i].id,dataUrl:res.toDataURL('image/png'),_w:res.width,_h:res.height,selected:true});updateProgress((i+1)/fs2.length*100);r()};img.src=fs2[i].dataUrl})}
     hideProgress();NM.setStatus(node.id,'done');NM.setSummary(node.id,fs2.length+' 帧已处理');
+    runtime.processedFrames=S.processedFrames;
     CM.pushData(node.id,'processed',{frames:S.processedFrames,summary:fs2.length+' 帧已处理'});showToast('处理完成','success')});
 }
 async function loadAiLib(){if(aiRemoveBgLib)return aiRemoveBgLib;const cdns=['https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.8/+esm','https://unpkg.com/@imgly/background-removal@1.5.8/dist/index.mjs'];
@@ -956,66 +1384,110 @@ async function loadAiLib(){if(aiRemoveBgLib)return aiRemoveBgLib;const cdns=['ht
 
 // --- Compose Sprite ---
 function bindComposeSprite(node,content){
+  const runtime=ensureNodeRuntime(node);
   const $=s=>content.querySelector(s);
+  const getCurrentProcessedFrames=()=>getNodeProcessedFrames(node);
   bindPresetBtns(content,'[data-w]','#d_sW',autoSH);
   $('#d_sW').addEventListener('input',autoSH);
-  function autoSH(){const w=parseInt($('#d_sW').value)||512;if(S.processedFrames.length&&S.processedFrames[0]._w){$('#d_sH').value=Math.round(w/S.processedFrames[0]._w*S.processedFrames[0]._h)}}
-  if(S.spriteData){
-    const cv=$('#d_sCanvas');const img=new Image();img.onload=()=>{
-      cv.width=img.width;cv.height=img.height;cv.getContext('2d').drawImage(img,0,0);
-      $('#d_sPreview').style.display='block';
-      $('#d_sInfo').innerHTML='尺寸 <strong>'+img.width+'x'+img.height+'</strong> | 帧数 <strong>'+S.spriteData.frames.length+'</strong>';
-    };img.src=S.spriteData.image;
-  }
-  $('#d_pixelArt').addEventListener('change',()=>{const on=$('#d_pixelArt').checked;$('#d_pixelCtrls').style.opacity=on?'1':'.4';$('#d_pixelCtrls').style.pointerEvents=on?'auto':'none';$('#d_pxSize').disabled=!on;$('#d_pxLevels').disabled=!on;$('#d_pxOutline').disabled=!on});
+  function autoSH(){const w=parseInt($('#d_sW').value)||512;const processedFrames=getCurrentProcessedFrames();if(processedFrames.length&&processedFrames[0]._w){$('#d_sH').value=Math.round(w/processedFrames[0]._w*processedFrames[0]._h)}}
+  const spriteState=runtime.spriteData||S.spriteData;
+  if(spriteState){const cv=$('#d_sCanvas');const img=new Image();img.onload=()=>{cv.width=img.width;cv.height=img.height;cv.getContext('2d').drawImage(img,0,0);$('#d_sPreview').style.display='block';$('#d_sInfo').innerHTML='尺寸 <strong>'+img.width+'x'+img.height+'</strong> | 帧数 <strong>'+spriteState.frames.length+'</strong>';};img.src=spriteState.image}
+  $('#d_pixelArt').addEventListener('change',()=>{const on=$('#d_pixelArt').checked;$('#d_pixelCtrls').style.opacity=on?'1':'.4';$('#d_pixelCtrls').style.pointerEvents=on?'auto':'none';$('#d_pxSize').disabled=!on;$('#d_pxLevels').disabled=!on;$('#d_pxOutline').disabled=!on;runtime.pixelArt=on;PM.save()});
+  if(runtime.pixelArt){$('#d_pixelArt').checked=true;$('#d_pixelCtrls').style.opacity='1';$('#d_pixelCtrls').style.pointerEvents='auto';$('#d_pxSize').disabled=false;$('#d_pxLevels').disabled=false;$('#d_pxOutline').disabled=false}
   $('#d_sGenBtn').addEventListener('click',()=>{
-    if(!S.processedFrames.length)return;
-    const w=parseInt($('#d_sW').value),h=parseInt($('#d_sH').value),cols=parseInt($('#d_sCols').value),rows=Math.ceil(S.processedFrames.length/cols);
+    const processedFrames=getCurrentProcessedFrames();
+    if(!processedFrames.length)return;
+    const w=parseInt($('#d_sW').value),h=parseInt($('#d_sH').value),cols=parseInt($('#d_sCols').value),rows=Math.ceil(processedFrames.length/cols);
     const cv=$('#d_sCanvas');cv.width=w*cols;cv.height=h*rows;const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);
     let loaded=0;const fd=[];
-    S.processedFrames.forEach((f,i)=>{const img=new Image();img.onload=()=>{const c=i%cols,r=Math.floor(i/cols);const fc=document.createElement('canvas');fc.width=w;fc.height=h;const fctx=fc.getContext('2d');fctx.clearRect(0,0,w,h);
+    processedFrames.forEach((f,i)=>{const img=new Image();img.onload=()=>{const c=i%cols,r=Math.floor(i/cols);const fc=document.createElement('canvas');fc.width=w;fc.height=h;const fctx=fc.getContext('2d');fctx.clearRect(0,0,w,h);
       const sc=Math.min(w/img.width,h/img.height);fctx.drawImage(img,(w-img.width*sc)/2,(h-img.height*sc)/2,img.width*sc,img.height*sc);
       let final=fc;if($('#d_pixelArt').checked)final=applyPixelArt(fc,parseInt($('#d_pxSize').value)||4,parseInt($('#d_pxLevels').value)||4,$('#d_pxOutline').checked);
       ctx.drawImage(final,c*w,r*h);fd.push({index:i,name:'frame_'+i,x:c*w,y:r*h,width:w,height:h,originalWidth:img.width,originalHeight:img.height});
-      loaded++;if(loaded===S.processedFrames.length){$('#d_sPreview').style.display='block';$('#d_sInfo').innerHTML='尺寸 <strong>'+cv.width+'x'+cv.height+'</strong> | 帧数 <strong>'+S.processedFrames.length+'</strong> | <strong>'+cols+'x'+rows+'</strong>';
-        S.spriteData={image:cv.toDataURL('image/png'),frames:fd,meta:{version:'1.0',format:'RGBA8888',size:{w:cv.width,h:cv.height},scale:1}};
-        NM.setStatus(node.id,'done');NM.setSummary(node.id,S.processedFrames.length+'帧精灵图');
-        CM.pushData(node.id,'sprite',{dataUrl:S.spriteData.image,summary:S.processedFrames.length+'帧精灵图',frames:S.spriteData.frames,meta:S.spriteData.meta});showToast('精灵图完成','success')}
-    };img.src=f.dataUrl});
+      loaded++;if(loaded===processedFrames.length){$('#d_sPreview').style.display='block';$('#d_sInfo').innerHTML='尺寸 <strong>'+cv.width+'x'+cv.height+'</strong> | 帧数 <strong>'+processedFrames.length+'</strong> | <strong>'+cols+'x'+rows+'</strong>';
+        runtime.spriteData={image:cv.toDataURL('image/png'),frames:fd,meta:{version:'1.0',format:'RGBA8888',size:{w:cv.width,h:cv.height},scale:1}};
+        S.spriteData=runtime.spriteData;
+        NM.setStatus(node.id,'done');NM.setSummary(node.id,processedFrames.length+'帧精灵图');
+        const payload={dataUrl:runtime.spriteData.image,summary:processedFrames.length+'帧精灵图',frames:runtime.spriteData.frames,sourceFrames:processedFrames,meta:runtime.spriteData.meta};
+        CM.pushData(node.id,'sprite',payload);
+        recordResult('sprite',node,payload,processedFrames.length+'帧精灵图',{previewUrl:runtime.spriteData.image});
+        PM.save();
+        showToast('精灵图完成','success')}};img.src=f.dataUrl});
   });
-  $('#d_sDownPng').addEventListener('click',()=>{if(!S.spriteData)return;const a=document.createElement('a');a.download='sprite.png';a.href=S.spriteData.image;a.click()});
-  $('#d_sDownJson').addEventListener('click',()=>{if(!S.spriteData)return;const j={frames:{},meta:S.spriteData.meta};S.spriteData.frames.forEach(f=>{j.frames[f.name]={frame:{x:f.x,y:f.y,w:f.width,h:f.height},rotated:false,trimmed:false,spriteSourceSize:{x:0,y:0,w:f.width,h:f.height},sourceSize:{w:f.width,h:f.height}}});dl(JSON.stringify(j,null,2),'sprite.json','application/json')});
-  $('#d_sDownGif').addEventListener('click',()=>{if(!S.processedFrames.length)return;exportGif(S.processedFrames,parseInt($('#d_sW').value)||512,parseInt($('#d_sH').value)||512,parseInt($('#d_sGifFps').value)||12,$('#d_pixelArt').checked,content)});
+  $('#d_sDownPng').addEventListener('click',()=>{if(!runtime.spriteData)return;const a=document.createElement('a');a.download='sprite.png';a.href=runtime.spriteData.image;a.click()});
+  $('#d_sDownJson').addEventListener('click',()=>{if(!runtime.spriteData)return;const j={frames:{},meta:runtime.spriteData.meta};runtime.spriteData.frames.forEach(f=>{j.frames[f.name]={frame:{x:f.x,y:f.y,w:f.width,h:f.height},rotated:false,trimmed:false,spriteSourceSize:{x:0,y:0,w:f.width,h:f.height},sourceSize:{w:f.width,h:f.height}}});dl(JSON.stringify(j,null,2),'sprite.json','application/json')});
+  $('#d_sDownGif').addEventListener('click',()=>{const processedFrames=getCurrentProcessedFrames();if(!processedFrames.length)return;exportGif(processedFrames,parseInt($('#d_sW').value)||512,parseInt($('#d_sH').value)||512,parseInt($('#d_sGifFps').value)||12,$('#d_pixelArt').checked,content,node)});
 }
 
 // --- Export ---
 function bindExport(node,content){
   const $=s=>content.querySelector(s);
-  const upData=CM.getInputData(node.id,'sprite');
-  if(upData&&upData.dataUrl){$('#d_expPreview').innerHTML='<img src="'+upData.dataUrl+'" style="max-width:100%;border-radius:6px">'}
+  const getCurrentSprite=()=>CM.getInputData(node.id,'sprite');
+  const getCurrentImages=()=>CM.getInputData(node.id,'images');
+  const initialSprite=getCurrentSprite();
+  const initialImages=getCurrentImages();
+  if(initialSprite&&initialSprite.dataUrl){$('#d_expPreview').innerHTML='<img src="'+initialSprite.dataUrl+'" style="max-width:100%;border-radius:6px">'}
+  else if(initialImages&&getPrimaryDataUrl(initialImages)){$('#d_expPreview').innerHTML='<img src="'+getPrimaryDataUrl(initialImages)+'" style="max-width:100%;border-radius:6px">'}
   $('#d_expPng').addEventListener('click',()=>{
-    const u=upData&&upData.dataUrl;if(u){const a=document.createElement('a');a.download='sprite.png';a.href=u;a.click()}
+    const upSprite=getCurrentSprite();
+    const upImages=getCurrentImages();
+    const spriteUrl=upSprite&&upSprite.dataUrl;
+    const imageUrl=upImages&&getPrimaryDataUrl(upImages);
+    if(spriteUrl){const a=document.createElement('a');a.download='sprite.png';a.href=spriteUrl;a.click()}
+    else if(imageUrl){const a=document.createElement('a');a.download='image.png';a.href=imageUrl;a.click()}
     else if(S.spriteData){const a=document.createElement('a');a.download='sprite.png';a.href=S.spriteData.image;a.click()}
     else if(S.directSpriteData){const a=document.createElement('a');a.download='sprite.png';a.href=S.directSpriteData.image;a.click()}
   });
   $('#d_expJson').addEventListener('click',()=>{
-    let d=(upData&&upData.frames)?upData:(S.spriteData||S.directSpriteData);
-    if(!d||!d.frames)return;
+    const upSprite=getCurrentSprite();
+    let d=(upSprite&&upSprite.frames)?upSprite:(S.spriteData||S.directSpriteData);
+    if(!d||!d.frames){showToast('当前输入不是精灵图，无法导出 JSON','warning');return}
     const j={frames:{},meta:d.meta||{}};
     d.frames.forEach(f=>{j.frames[f.name]={frame:{x:f.x,y:f.y,w:f.width,h:f.height},rotated:false,trimmed:false,spriteSourceSize:{x:0,y:0,w:f.width,h:f.height},sourceSize:{w:f.width,h:f.height}}});
     dl(JSON.stringify(j,null,2),'sprite.json','application/json');
   });
-  $('#d_expGif').addEventListener('click',()=>{
-    const frames=S.processedFrames.length?S.processedFrames:S.frames.filter(f=>f.selected);
-    if(!frames.length){showToast('无帧数据','warning');return}
-    let w=512,h=512;
-    if(upData&&upData.meta&&upData.meta.size){w=parseInt(upData.meta.size.w/(upData.frames.length||1));h=upData.meta.size.h/(Math.ceil(upData.frames.length/4))}
-    else if(S.spriteData){w=parseInt(S.spriteData.meta.size.w/(S.spriteData.frames.length||1));h=S.spriteData.meta.size.h/(Math.ceil(S.spriteData.frames.length/4))}
-    exportGif(frames,w||512,h||512,12,false,content);
+  $('#d_expGif').addEventListener('click',async()=>{
+    const upSprite=getCurrentSprite();
+    const upImages=getCurrentImages();
+    const fps=parseInt(node.config&&node.config.gifFps||12)||12;
+    if(upSprite&&upSprite.sourceFrames&&upSprite.sourceFrames.length){
+      let w=512,h=512;
+      if(upSprite.frames&&upSprite.frames.length){const rect=getSpriteFrameRect(upSprite.frames[0]);w=rect.w||w;h=rect.h||h}
+      await exportGif(upSprite.sourceFrames,w,h,fps,false,content);
+      return;
+    }
+    if(upSprite&&upSprite.dataUrl&&upSprite.frames&&upSprite.frames.length){
+      await exportGifFromSprite(upSprite,fps,content);
+      return;
+    }
+    if(upImages){
+      const imageFrames=await resolveImageInputFrames(node);
+      if(imageFrames.length){
+        const first=imageFrames[0]||{};
+        await exportGif(imageFrames,first._w||512,first._h||512,fps,false,content);
+        return;
+      }
+    }
+    const fallbackFrames=(S.processedFrames.length&&S.processedFrames)||S.frames.filter(f=>f.selected);
+    if(!fallbackFrames.length){showToast('无帧数据','warning');return}
+    await exportGif(fallbackFrames,512,512,fps,false,content);
   });
 }
 
+
+async function exportGifFromSprite(spriteData,fps,content){
+  const frames=await buildFramesFromSpriteAtlas(spriteData);
+  if(!frames.length){showToast('无法从精灵图切出帧','warning');return}
+  let w=frames[0]._w||512,h=frames[0]._h||512;
+  if(spriteData&&spriteData.frames&&spriteData.frames.length){
+    const rect=getSpriteFrameRect(spriteData.frames[0]);
+    w=rect.w||w;h=rect.h||h;
+  }
+  await exportGif(frames,w,h,fps,false,content);
+}
+
 // === Business Logic ===
+
 function rgbHex(r,g,b){return '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('')}
 function colorDistance(a,b){return Math.sqrt((a.r-b.r)**2+(a.g-b.g)**2+(a.b-b.b)**2)}
 function removeBg(src,tol,tolerance,feather){
@@ -1064,7 +1536,7 @@ function buildGIF(frames,w,h,delay,pal,ti){
   for(const f of frames){ws('\x21\xF9\x04');wv(ti>=0?0x09:0x04);w16(d);wv(ti>=0?ti:0);wv(0);wv(0x2C);w16(0);w16(0);w16(w);w16(h);wv(0);const lzw=lzwEncode(f.pixels,8);for(const b of lzw)wv(b)}
   wv(0x3B);return new Uint8Array(o);
 }
-async function exportGif(frames,fw,fh,fps,pixelArt,content){
+async function exportGif(frames,fw,fh,fps,pixelArt,content,node){
   showProgress('生成 GIF...');const c=document.createElement('canvas');c.width=fw;c.height=fh;const ctx=c.getContext('2d');
   const allImg=[];for(let i=0;i<frames.length;i++){await new Promise(r=>{const img=new Image();img.onload=()=>{ctx.clearRect(0,0,fw,fh);const sc=Math.min(fw/img.width,fh/img.height);ctx.drawImage(img,(fw-img.width*sc)/2,(fh-img.height*sc)/2,img.width*sc,img.height*sc);
     if(pixelArt){const pa=applyPixelArt(c,4,4,false);ctx.clearRect(0,0,fw,fh);ctx.drawImage(pa,0,0)}
@@ -1075,7 +1547,10 @@ async function exportGif(frames,fw,fh,fps,pixelArt,content){
   const q=buildQuantizer(merged,255);const gp=new Uint8Array(768);for(let i=0;i<255;i++){gp[(i+1)*3]=q.palette[i*3];gp[(i+1)*3+1]=q.palette[i*3+1];gp[(i+1)*3+2]=q.palette[i*3+2]}
   updateProgress(70);const gf=allImg.map(id=>{const px=new Uint8Array(fw*fh);for(let p=0;p<fw*fh;p++){const i=p*4;px[p]=id.data[i+3]<128?0:q.findIndex(id.data[i],id.data[i+1],id.data[i+2])+1}return{pixels:px}});
   updateProgress(80);const gb=buildGIF(gf,fw,fh,Math.round(1000/fps),gp,0);hideProgress();
-  const blob=new Blob([gb],{type:'image/gif'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.download='animation.gif';a.href=url;a.click();URL.revokeObjectURL(url);showToast('GIF 导出完成','success');
+  const blob=new Blob([gb],{type:'image/gif'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.download='animation.gif';a.href=url;a.click();URL.revokeObjectURL(url);
+  const dataUrl=await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.readAsDataURL(blob)});
+  if(node){await recordResult('gif',node,{dataUrl,summary:'GIF 已导出'},'GIF 已导出',{previewUrl:dataUrl})}
+  showToast('GIF 导出完成','success');
 }
 function dl(content,name,type){const b=new Blob([content],{type});const u=URL.createObjectURL(b);const a=document.createElement('a');a.download=name;a.href=u;a.click();URL.revokeObjectURL(u)}
 function bindPresetBtns(content,sel,inputSel,autoFn){content.querySelectorAll(sel).forEach(btn=>{btn.addEventListener('click',()=>{content.querySelectorAll(sel).forEach(b=>b.classList.remove('active'));btn.classList.add('active');content.querySelector(inputSel).value=btn.dataset.dw||btn.dataset.w;autoFn()})})}
@@ -1095,12 +1570,17 @@ function openContextMenu(x,y,items){
 }
 
 document.getElementById('settingsBtn').addEventListener('click',()=>{document.getElementById('sessionIdInput').value=S.sessionid;document.getElementById('settingsModal').classList.add('vis')});
+document.getElementById('collapseNodesBtn').addEventListener('click',()=>NM.collapseAllExpanded());
+document.getElementById('resultsBtn').addEventListener('click',()=>toggleResultsPanel());
+document.getElementById('resultsCloseBtn').addEventListener('click',()=>toggleResultsPanel(false));
+document.getElementById('resultsRefreshBtn').addEventListener('click',async()=>{try{const r=await fetch('/api/results');if(r.ok){const data=await r.json();S.resultLibrary=Array.isArray(data.results)?data.results:S.resultLibrary;PM.saveResults();}}catch{}renderResultsPanel()});
+
 document.getElementById('settingsCancelBtn').addEventListener('click',()=>document.getElementById('settingsModal').classList.remove('vis'));
 document.getElementById('settingsSaveBtn').addEventListener('click',()=>{const v=document.getElementById('sessionIdInput').value.trim();S.sessionid=v;localStorage.setItem('jimeng_sessionid',v);document.getElementById('settingsModal').classList.remove('vis');updateSessionStatus();showToast(v?'已保存':'已清除','success')});
 document.getElementById('serviceStatus').addEventListener('click',async e=>{const s=await refreshServiceStatus();if(document.getElementById('serviceStatusText').textContent==='后端不可达'){showToast('请先运行 node server.js','warning',4000);return}const acts={running:{label:'重启 AI 服务',action:'restart'},starting:{label:'强制重启 AI 服务',action:'restart'},stopped:{label:'启动 AI 服务',action:'start'},error:{label:'重启 AI 服务',action:'restart'}};const entry=acts[s]||acts.error;openContextMenu(e.clientX,e.clientY,[{label:entry.label,action:()=>callServiceAction(entry.action)}])});
 refreshServiceStatus();setInterval(refreshServiceStatus,10000);
 document.getElementById('resetLayoutBtn').addEventListener('click',()=>PM.reset());
-document.getElementById('addNodeBtn').addEventListener('click',e=>{openContextMenu(e.clientX,e.clientY,NODE_CATALOG.map(nd=>({label:nd.icon+' '+nd.title,action:()=>{const point=CC.screenToWorld(window.innerWidth/2,180);NM.addNodeAt(nd.typeId,point.x,point.y);PM.save()}})))});
+document.getElementById('addNodeBtn').addEventListener('click',e=>{openContextMenu(e.clientX,e.clientY,NODE_CATALOG.filter(nd=>nd.typeId!=='img2img').map(nd=>({label:nd.icon+' '+nd.title,action:()=>{const point=CC.screenToWorld(window.innerWidth/2,180);NM.addNodeAt(nd.typeId,point.x,point.y);PM.save()}})))});
 
 function loadStarterFlow(){
   STARTER_FLOW.nodes.forEach(nd=>NM.createNode(nd.id,nd.x,nd.y,CATALOG_BY_TYPE[nd.typeId]));
@@ -1109,8 +1589,9 @@ function loadStarterFlow(){
 
 // === Init ===
 CC.init();NM.init();CM.init();
-document.getElementById('wfCanvas').addEventListener('click',e=>{if(e.target===CC.canvas||e.target===CC.world||e.target.tagName==='svg'){CM.cancelReconnect();NM.collapseAllExpanded();document.getElementById('ctxMenu').classList.remove('vis')}});
+document.getElementById('wfCanvas').addEventListener('click',e=>{if(e.target===CC.canvas||e.target===CC.world||e.target.tagName==='svg'){CM.cancelReconnect();document.getElementById('ctxMenu').classList.remove('vis')}});
 if(!PM.load())loadStarterFlow();
+renderResultsPanel();
 updateSessionStatus();
 setInterval(()=>PM.save(),5000);
 // === Context Menu ===
@@ -1118,13 +1599,15 @@ setInterval(()=>PM.save(),5000);
   const menu=document.getElementById('ctxMenu');
   function hideMenu(){menu.classList.remove('vis')}
   document.addEventListener('click',hideMenu);
+  document.getElementById('resultsPanel').addEventListener('click',e=>e.stopPropagation());
+  document.getElementById('resultsBtn').addEventListener('click',e=>e.stopPropagation());
   document.addEventListener('contextmenu',e=>{
     const nodeEl=e.target.closest('.wf-node');
     if(nodeEl)return; // don't show on nodes
     const canvasEl=e.target.closest('.wf-canvas');
     if(!canvasEl)return;
     e.preventDefault();
-    menu.innerHTML=NODE_CATALOG.map(nd=>'<div class="ctx-menu-item" data-type="'+nd.typeId+'"><span>'+nd.icon+'</span><span>'+nd.title+'</span></div>').join('');
+    menu.innerHTML=NODE_CATALOG.filter(nd=>nd.typeId!=='img2img').map(nd=>'<div class="ctx-menu-item" data-type="'+nd.typeId+'"><span>'+nd.icon+'</span><span>'+nd.title+'</span></div>').join('');
     menu.querySelectorAll('.ctx-menu-item').forEach(item=>{
       item.addEventListener('click',()=>{NM.addNodeAt(item.dataset.type,e.clientX,e.clientY);hideMenu();PM.save()});
     });
