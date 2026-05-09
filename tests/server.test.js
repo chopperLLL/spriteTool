@@ -87,6 +87,7 @@ describe('server.js', () => {
             '.webp': 'image/webp',
             '.mp4': 'video/mp4',
             '.webm': 'video/webm',
+            '.onnx': 'application/octet-stream',
             '.woff2': 'font/woff2',
         };
 
@@ -231,7 +232,42 @@ describe('健康检查逻辑', () => {
         });
     });
 
-    describe('前端 AI 抠图容错', () => {
+    describe('RMBG-2 后端 PoC', () => {
+        it('应该声明 onnx 模型与推理脚本路径', () => {
+            const content = fs.readFileSync(path.join(TEST_DIR, 'server.js'), 'utf-8');
+            assert.ok(content.includes("const RMBG_DIR = path.join(__dirname, 'model', 'RMBG-2');"), '应声明 RMBG 目录');
+            assert.ok(content.includes("const RMBG_MODEL_PATH = path.join(RMBG_DIR, 'model.onnx');"), '应声明 RMBG 模型路径');
+            assert.ok(content.includes("const RMBG_INFER_SCRIPT = path.join(RMBG_DIR, 'infer.py');"), '应声明 RMBG 推理脚本路径');
+        });
+
+        it('应该支持 .onnx 静态文件类型', () => {
+            const content = fs.readFileSync(path.join(TEST_DIR, 'server.js'), 'utf-8');
+            assert.ok(content.includes("'.onnx': 'application/octet-stream'"), '应为 onnx 提供 MIME 类型');
+        });
+
+        it('检测到 PyTorch 权重时应该优先使用 PyTorch 脚本', () => {
+            const content = fs.readFileSync(path.join(TEST_DIR, 'server.js'), 'utf-8');
+            assert.ok(content.includes("const RMBG_INFER_PYTORCH_SCRIPT = path.join(RMBG_DIR, 'infer_pytorch.py');"), '应声明 PyTorch 推理脚本');
+            assert.ok(content.includes("log('[RMBG] 优先使用 PyTorch CUDA 脚本');"), '检测到权重后应优先走 PyTorch CUDA');
+            assert.ok(content.includes("'--model-dir', RMBG_DIR"), 'PyTorch 脚本应接收模型目录');
+        });
+
+        it('应该默认使用当前 Python 3.14，并允许环境变量覆盖', () => {
+            const content = fs.readFileSync(path.join(TEST_DIR, 'server.js'), 'utf-8');
+            assert.ok(content.includes("const RMBG_PYTHON = process.env.RMBG_PYTHON || 'C:\\\\Users\\\\chenlei\\\\AppData\\\\Local\\\\Python\\\\pythoncore-3.14-64\\\\python.exe';"), '应将 Python 3.14 设为默认解释器');
+        });
+
+        it('应该支持记录 Python 与 provider 诊断信息', () => {
+            const content = fs.readFileSync(path.join(TEST_DIR, 'server.js'), 'utf-8');
+            assert.ok(content.includes("log('[RMBG] python='"), '应记录 Python 可执行文件');
+            assert.ok(content.includes("log('[RMBG] backend='"), '应记录后端类型');
+            assert.ok(content.includes("log('[RMBG] selectedProvider='"), '应记录当前 provider');
+            assert.ok(content.includes("log('[RMBG] availableProviders='"), '应记录可用 provider');
+            assert.ok(content.includes("log('[RMBG] runtime='"), '应记录运行时版本');
+        });
+
+
+
         it('应该包含备用 CDN 源', () => {
             const content = fs.readFileSync(path.join(TEST_DIR, 'sprite-tool.html'), 'utf-8');
             assert.ok(content.includes('cdn.jsdelivr.net'), '应包含 jsdelivr CDN');
@@ -254,8 +290,8 @@ describe('健康检查逻辑', () => {
         });
     });
 
-describe('集成测试', () => {
-    it('所有必需文件应该存在', () => {
+    describe('集成测试', () => {
+        it('所有必需文件应该存在', () => {
         const requiredFiles = [
             'sprite-tool.html',
             'server.js',
@@ -269,7 +305,7 @@ describe('集成测试', () => {
         }
     });
 
-    it('sprite-tool.html 应该包含必要的结构', () => {
+        it('sprite-tool.html 应该包含必要的结构', () => {
         const content = fs.readFileSync(path.join(TEST_DIR, 'sprite-tool.html'), 'utf-8');
 
         assert.ok(content.includes('<!DOCTYPE html>'), '应该是有效的 HTML 文档');

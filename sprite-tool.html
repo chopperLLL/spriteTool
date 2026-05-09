@@ -205,6 +205,7 @@ const RESULT_REUSE_TARGETS={image:['aiImage','img2img','removeBg','export'],vide
 
 // === Toast ===
 function showToast(msg,type='info',dur=3000){const c=document.getElementById('toastContainer');const t=document.createElement('div');t.className='toast '+type;const icons={info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',success:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',warning:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',error:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'};t.innerHTML=(icons[type]||icons.info)+'<span>'+msg+'</span>';c.appendChild(t);setTimeout(()=>{t.classList.add('out');t.addEventListener('animationend',()=>t.remove())},dur)}
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 // === Progress ===
 function showProgress(t){document.getElementById('progressText').textContent=t;document.getElementById('progressFill').style.width='0%';document.getElementById('progressPercent').textContent='0%';document.getElementById('progressOverlay').classList.add('vis')}
 function updateProgress(p){document.getElementById('progressFill').style.width=p+'%';document.getElementById('progressPercent').textContent=Math.round(p)+'%'}
@@ -494,6 +495,7 @@ function syncNodeInputPreview(nodeId,portId,data){
     const previewUrl=(data&&data.urls&&data.urls[0])||null;
     const safePreviewUrl=buildImageSourceUrl(previewUrl);
     if(safePreviewUrl){const img=new Image();img.onload=()=>{cv.width=img.width;cv.height=img.height;ctx.drawImage(img,0,0)};img.src=safePreviewUrl}
+    updateRemoveBgInputPreview(node,content,data);
     return;
   }
   if(node.typeId==='composeSprite'&&portId==='processed'){
@@ -690,8 +692,14 @@ async function buildFramesFromSpriteData(spriteData){
 async function buildFramesFromSpriteAtlas(spriteData){
   return buildFramesFromSpriteData(spriteData);
 }
+function getRemoveBgInputData(node){
+  if(!node||node.typeId!=='removeBg')return CM.getInputData(node&&node.id?node.id:'','images');
+  const runtime=ensureNodeRuntime(node);
+  if(runtime.localImageData&&Array.isArray(runtime.localImageData.frames)&&runtime.localImageData.frames.length)return runtime.localImageData;
+  return CM.getInputData(node.id,'images');
+}
 async function resolveImageInputFrames(node){
-  const data=CM.getInputData(node.id,'images');
+  const data=getRemoveBgInputData(node);
   if(data&&Array.isArray(data.frames)&&data.frames.length)return data.frames;
   if(data&&Array.isArray(data.spriteFrames)&&data.spriteFrames.length)return buildFramesFromSpriteData(data);
   if(data&&Array.isArray(data.urls)&&data.urls.length)return buildUrlFrames(data.urls);
@@ -946,9 +954,12 @@ function renderImg2Img(){
   '<button class="accent" id="d_i2iGenBtn" style="width:100%;margin-top:6px">生成</button><div id="d_i2iResults" style="margin-top:10px"></div>';
 }
 function renderRemoveBg(){
-  return '<div style="margin-bottom:8px;display:flex;gap:4px"><button class="secondary" id="d_bgAiTab" style="flex:1;padding:5px">AI 抠图</button><button class="secondary" id="d_bgColorTab" style="flex:1;padding:5px;border-color:var(--accent);color:var(--accent)">颜色抠图</button></div>'+
-  '<div id="d_bgAiPanel" style="display:none"><div class="hint">AI 自动去除背景。</div><div id="d_bgAiStatus" style="text-align:center;padding:14px 0"><p style="color:var(--text-dim);margin-bottom:8px;font-size:.78rem">点击开始 AI 抠图</p><button class="accent" id="d_bgAiStart">开始 AI 抠图</button></div><div id="d_bgAiProg" style="display:none;text-align:center;padding:8px 0"><div class="progress-bar" style="max-width:220px;margin:0 auto 6px"><div class="progress-fill" id="d_bgAiFill" style="width:0"></div></div><p style="color:var(--text-dim);font-size:.78rem" id="d_bgAiProgTxt">0/0</p><div class="frames-grid" id="d_bgAiThumbs" style="margin-top:10px"></div></div></div>'+
-  '<div id="d_bgColorPanel"><div class="hint">点击图片选择背景色，调整容差后批量处理。</div><div class="color-picker-area"><div class="picker-preview"><div class="picker-canvas-container" id="d_pickerCtn"><canvas id="pickerCanvas"></canvas><div class="picker-cursor" id="pickerCursor"><div class="pc" id="pickerPreviewColor"></div><div class="ph" id="pickerPreviewHex"></div></div></div></div><div class="picker-controls"><div class="color-display"><div class="color-box" id="colorBox"></div><div class="color-value" id="colorValue">#000000</div></div><div class="slider-group"><label>容差 <span class="val" id="toleranceValue">30</span></label><input type="range" id="toleranceSlider" min="0" max="100" value="30"></div><div class="slider-group"><label>羽化 <span class="val" id="featherValue">2</span></label><input type="range" id="featherSlider" min="0" max="10" value="2"></div><div class="btn-group" style="margin-top:8px"><button id="previewRemoveBtn">预览</button><button class="accent" id="batchRemoveBtn">批量处理</button></div></div></div></div>';
+  return '<div class="hint">可使用上游图片，也可在此节点直接导入单张图片做抠图。</div>'+
+  '<div style="margin-bottom:10px;padding:10px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,.16)"><div class="cg" style="justify-content:space-between;margin-bottom:6px"><label>输入图片</label><div class="btn-group"><button class="secondary" id="d_bgLocalPick">导入单图</button><button class="secondary" id="d_bgLocalClear">清除本地图</button></div></div><input type="file" id="d_bgLocalFile" accept="image/*"><div id="d_bgInputPreview" style="text-align:center;padding:10px;border:1px dashed var(--border);border-radius:6px;min-height:84px"><p style="color:var(--text-muted);font-size:.78rem">等待上游输入或导入本地图片</p></div><div id="d_bgInputMeta" style="display:none;margin-top:6px;font-size:.74rem;color:var(--text-dim)"></div></div>'+
+  '<div style="margin-bottom:8px;display:flex;gap:4px"><button class="secondary" id="d_bgAiTab" style="flex:1;padding:5px">AI 抠图</button><button class="secondary" id="d_bgColorTab" style="flex:1;padding:5px;border-color:var(--accent);color:var(--accent)">颜色抠图</button></div>'+
+  '<div id="d_bgAiPanel" style="display:none"><div class="cg" style="margin-bottom:8px"><label>AI 方法</label><select id="d_bgAiMethod"><option value="imgly">imgly（前端）</option><option value="rmbg">RMBG-2（后端）</option></select></div><div class="hint" id="d_bgAiMethodHint">imgly 适合快速浏览器端处理。</div><div id="d_bgRmbgMeta" style="display:none;margin-bottom:8px;padding:8px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,.18);font-size:.74rem;line-height:1.5;color:var(--text-dim)"></div><div id="d_bgAiStatus" style="text-align:center;padding:14px 0"><p style="color:var(--text-dim);margin-bottom:8px;font-size:.78rem">点击开始 AI 抠图</p><button class="accent" id="d_bgAiStart">开始 AI 抠图</button></div><div id="d_bgAiProg" style="display:none;text-align:center;padding:8px 0"><div class="progress-bar" style="max-width:220px;margin:0 auto 6px"><div class="progress-fill" id="d_bgAiFill" style="width:0"></div></div><p style="color:var(--text-dim);font-size:.78rem" id="d_bgAiProgTxt">0/0</p><div class="frames-grid" id="d_bgAiThumbs" style="margin-top:10px"></div></div></div>'+
+  '<div id="d_bgColorPanel"><div class="hint">点击图片选择背景色，调整容差后批量处理。</div><div class="color-picker-area"><div class="picker-preview"><div class="picker-canvas-container" id="d_pickerCtn"><canvas id="pickerCanvas"></canvas><div class="picker-cursor" id="pickerCursor"><div class="pc" id="pickerPreviewColor"></div><div class="ph" id="pickerPreviewHex"></div></div></div></div><div class="picker-controls"><div class="color-display"><div class="color-box" id="colorBox"></div><div class="color-value" id="colorValue">#000000</div></div><div class="slider-group"><label>容差 <span class="val" id="toleranceValue">30</span></label><input type="range" id="toleranceSlider" min="0" max="100" value="30"></div><div class="slider-group"><label>羽化 <span class="val" id="featherValue">2</span></label><input type="range" id="featherSlider" min="0" max="10" value="2"></div><div class="btn-group" style="margin-top:8px"><button id="previewRemoveBtn">预览</button><button class="accent" id="batchRemoveBtn">批量处理</button></div></div></div></div>'+
+  '<div style="margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,.16)"><div class="cg" style="justify-content:space-between;margin-bottom:6px"><label>抠图结果预览</label><span id="d_bgResultLabel" style="font-size:.74rem;color:var(--text-dim)">暂无结果</span></div><div id="d_bgResultPreview" style="text-align:center;padding:10px;border:1px dashed var(--border);border-radius:6px;min-height:96px"><p style="color:var(--text-muted);font-size:.78rem">处理完成后将在这里预览结果</p></div></div>';
 }
 function renderComposeSprite(){
   return '<div class="sprite-options"><div class="cg"><label>宽度</label><div style="display:flex;gap:4px;align-items:center"><button class="preset-btn" data-w="64">64</button><button class="preset-btn" data-w="128">128</button><button class="preset-btn" data-w="256">256</button><button class="preset-btn active" data-w="512">512</button><input type="number" id="d_sW" value="512" min="64" max="2048" step="64" style="width:60px">px</div></div><div class="cg"><label>高度</label><input type="number" id="d_sH" value="512" min="64" max="2048" readonly style="width:60px">px</div><div class="cg"><label>列数</label><input type="number" id="d_sCols" value="4" min="1" max="20" style="width:56px"></div><div class="cg"><label class="toggle-label"><input type="checkbox" id="d_pixelArt"><span>像素画</span></label></div><div class="cg" id="d_pixelCtrls" style="opacity:.4;pointer-events:none"><label>像素</label><input type="number" id="d_pxSize" value="4" min="2" max="16" style="width:46px" disabled><label style="margin-left:4px">色阶</label><input type="number" id="d_pxLevels" value="4" min="2" max="32" style="width:46px" disabled><label class="toggle-label" style="margin-left:4px"><input type="checkbox" id="d_pxOutline" disabled><span>描边</span></label></div><button class="accent" id="d_sGenBtn" style="width:100%">生成精灵图</button></div>'+
@@ -1320,6 +1331,8 @@ function bindImg2Img(node,content){
 
 // --- Remove BG ---
 let aiRemoveBgLib=null;
+let rmbgOrtLib=null;
+let rmbgSessionPromise=null;
 function renderAiThumbGrid(node,content){
   const runtime=ensureNodeRuntime(node);
   const grid=content.querySelector('#d_bgAiThumbs');
@@ -1327,60 +1340,144 @@ function renderAiThumbGrid(node,content){
   const thumbs=runtime.aiThumbs||[];
   grid.innerHTML=thumbs.map(item=>'<div class="frame-item selected"><img src="'+item.url+'"><div class="frame-number">#'+item.index+'</div></div>').join('');
 }
+function updateRemoveBgInputPreview(node,content,sourceData){
+  const preview=content.querySelector('#d_bgInputPreview');
+  const meta=content.querySelector('#d_bgInputMeta');
+  if(!preview||!meta)return;
+  const url=sourceData&&getPrimaryDataUrl(sourceData)?getPrimaryDataUrl(sourceData):null;
+  if(!url){preview.innerHTML='<p style="color:var(--text-muted);font-size:.78rem">等待上游输入或导入本地图片</p>';meta.style.display='none';return}
+  const safeUrl=buildImageSourceUrl(url);
+  preview.innerHTML='<img src="'+safeUrl+'" style="max-width:100%;max-height:160px;border-radius:6px">';
+  const frame=(sourceData&&Array.isArray(sourceData.frames)&&sourceData.frames[0])||null;
+  const w=frame&&frame._w?frame._w:'';
+  const h=frame&&frame._h?frame._h:'';
+  const sourceLabel=sourceData&&sourceData.__localSource?'本地导入':'上游输入';
+  meta.style.display='block';
+  meta.textContent=sourceLabel+(w&&h?' · '+w+' × '+h:'');
+}
+function updateRemoveBgResultPreview(node,content,url,label='暂无结果'){
+  const preview=content.querySelector('#d_bgResultPreview');
+  const labelEl=content.querySelector('#d_bgResultLabel');
+  if(labelEl)labelEl.textContent=label;
+  if(!preview)return;
+  if(!url){preview.innerHTML='<p style="color:var(--text-muted);font-size:.78rem">处理完成后将在这里预览结果</p>';return}
+  preview.innerHTML='<img src="'+url+'" style="max-width:100%;max-height:180px;border-radius:6px">';
+}
+function updateRemoveBgMethodHint(content,method){
+  const hint=content.querySelector('#d_bgAiMethodHint');
+  if(!hint)return;
+  hint.textContent=method==='rmbg'?'RMBG-2 通过当前 Python 环境走后端推理，支持显示后端与 provider 信息。':'imgly 适合快速浏览器端处理。';
+}
+async function runRemoveBgWithImgly(node,content,frames){
+  const runtime=ensureNodeRuntime(node);
+  const lib=await loadAiLib();
+  content.querySelector('#d_bgAiProg').style.display='block';content.querySelector('#d_bgAiStatus').style.display='none';
+  runtime.aiThumbs=[];runtime.processedFrames=[];renderAiThumbGrid(node,content);
+  for(let i=0;i<frames.length;i++){
+    const blob=await (await fetch(frames[i].dataUrl)).blob();const rb=await lib.removeBackground(blob);const url=URL.createObjectURL(rb);
+    const img=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=url});
+    runtime.processedFrames.push({id:frames[i].id,dataUrl:url,_w:img.width,_h:img.height,selected:true});
+    runtime.aiThumbs.push({index:i+1,url});
+    S.processedFrames=runtime.processedFrames;
+    content.querySelector('#d_bgAiFill').style.width=(i+1)/frames.length*100+'%';content.querySelector('#d_bgAiProgTxt').textContent=(i+1)+'/'+frames.length;
+    if(i===0)updateRemoveBgResultPreview(node,content,url,'AI 结果预览');
+    renderAiThumbGrid(node,content);
+  }
+  content.querySelector('#d_bgAiProg').style.display='none';content.querySelector('#d_bgAiStatus').style.display='block';
+}
+async function runRemoveBgWithRmbg(node,content,frames){
+  const runtime=ensureNodeRuntime(node);
+  const meta=content.querySelector('#d_bgRmbgMeta');
+  content.querySelector('#d_bgAiProg').style.display='block';content.querySelector('#d_bgAiStatus').style.display='none';
+  runtime.aiThumbs=[];runtime.processedFrames=[];renderAiThumbGrid(node,content);
+  for(let i=0;i<frames.length;i++){
+    const result=await runRmbgProbe(frames[i].dataUrl);
+    const url=result.outputUrl;
+    runtime.processedFrames.push({id:frames[i].id,dataUrl:url,_w:result.sourceWidth,_h:result.sourceHeight,selected:true});
+    runtime.aiThumbs.push({index:i+1,url});
+    S.processedFrames=runtime.processedFrames;
+    content.querySelector('#d_bgAiFill').style.width=(i+1)/frames.length*100+'%';content.querySelector('#d_bgAiProgTxt').textContent=(i+1)+'/'+frames.length;
+    if(i===0){const version=result.frameworkVersion||result.onnxruntimeVersion||'未知';meta.style.display='block';meta.innerHTML='<div><strong>模型:</strong> /model/RMBG-2</div>'+'<div><strong>后端:</strong> '+escapeHtml(result.backend||'未知')+'</div>'+'<div><strong>推理端:</strong> '+escapeHtml(result.selectedProvider||((result.providers||[]).join(', '))||'未知')+'</div>'+'<div><strong>可用 provider:</strong> '+escapeHtml((result.availableProviders||[]).join(', ')||'未知')+'</div>'+'<div><strong>Python:</strong> '+escapeHtml(result.pythonExecutable||'未知')+'</div>'+'<div><strong>框架版本:</strong> '+escapeHtml(version)+'</div>'+'<div><strong>输入:</strong> '+escapeHtml(result.inputName)+' '+escapeHtml(JSON.stringify(result.inputDims))+'</div>'+'<div><strong>输出:</strong> '+escapeHtml(result.outputName)+' '+escapeHtml(JSON.stringify(result.outputDims))+'</div>'+'<div><strong>原始输出 shape:</strong> '+escapeHtml(JSON.stringify(result.rawOutputShape||[]))+'</div>'+'<div><strong>源尺寸:</strong> '+result.sourceWidth+' × '+result.sourceHeight+'</div>'+'<div><strong>推理尺寸:</strong> '+result.targetWidth+' × '+result.targetHeight+'</div>'+'<div><strong>mask 范围:</strong> '+escapeHtml(String(result.maskMin))+' ~ '+escapeHtml(String(result.maskMax))+'</div>';updateRemoveBgResultPreview(node,content,url,'RMBG-2 结果预览')}
+    renderAiThumbGrid(node,content);
+  }
+  content.querySelector('#d_bgAiProg').style.display='none';content.querySelector('#d_bgAiStatus').style.display='block';
+}
 
 function bindRemoveBg(node,content){
   const $=s=>content.querySelector(s);
   const config=ensureNodeConfig(node);const runtime=ensureNodeRuntime(node);
   const getCurrentInputFrames=()=>resolveImageInputFrames(node);
   S.tolerance=config.tolerance??S.tolerance;S.feather=config.feather??S.feather;
+  config.aiMethod=config.aiMethod||'imgly';
   $('#toleranceSlider').value=S.tolerance;$('#toleranceValue').textContent=S.tolerance;
   $('#featherSlider').value=S.feather;$('#featherValue').textContent=S.feather;
+  $('#d_bgAiMethod').value=config.aiMethod;
+  updateRemoveBgMethodHint(content,config.aiMethod);
+  updateRemoveBgInputPreview(node,content,getRemoveBgInputData(node));
+  if(runtime.processedFrames&&runtime.processedFrames.length)updateRemoveBgResultPreview(node,content,runtime.processedFrames[0].dataUrl,'最近处理结果');
   const aiTab=$('#d_bgAiTab'),colTab=$('#d_bgColorTab'),aiP=$('#d_bgAiPanel'),colP=$('#d_bgColorPanel');
   aiTab.addEventListener('click',()=>{aiP.style.display='block';colP.style.display='none';aiTab.style.borderColor='var(--accent)';aiTab.style.color='var(--accent)';colTab.style.borderColor='';colTab.style.color=''});
   colTab.addEventListener('click',()=>{aiP.style.display='none';colP.style.display='block';colTab.style.borderColor='var(--accent)';colTab.style.color='var(--accent)';aiTab.style.borderColor='';aiTab.style.color=''});
   if(runtime.aiThumbs&&runtime.aiThumbs.length){$('#d_bgAiStatus').innerHTML='<p style="color:var(--success);margin-bottom:6px;font-size:.78rem">已处理 '+runtime.aiThumbs.length+' 帧</p><button class="accent" id="d_bgAiStart">重新抠图</button>'}
   renderAiThumbGrid(node,content);
-  // AI remove bg
+  $('#d_bgAiMethod').addEventListener('change',e=>{config.aiMethod=e.target.value;updateRemoveBgMethodHint(content,config.aiMethod);PM.save()});
+  const localFile=$('#d_bgLocalFile'),localPick=$('#d_bgLocalPick'),localClear=$('#d_bgLocalClear');
+  localPick.addEventListener('click',()=>localFile.click());
+  localFile.addEventListener('change',()=>{if(localFile.files&&localFile.files[0])loadLocalImage(localFile.files[0])});
+  localClear.addEventListener('click',()=>{runtime.localImageData=null;localFile.value='';updateRemoveBgInputPreview(node,content,getRemoveBgInputData(node));PM.save()});
+  function loadLocalImage(file){const reader=new FileReader();reader.onload=e=>{const dataUrl=e.target.result;const img=new Image();img.onload=()=>{runtime.localImageData={urls:[dataUrl],frames:[{id:'local_0',dataUrl,_w:img.width,_h:img.height,selected:true}],summary:'本地单图',__localSource:true};updateRemoveBgInputPreview(node,content,runtime.localImageData);PM.save()};img.src=dataUrl};reader.readAsDataURL(file)}
   content.querySelector('#d_bgAiStart')&&content.querySelector('#d_bgAiStart').addEventListener('click',async()=>{
     const fs=await getCurrentInputFrames();if(!fs.length){showToast('请先选择帧','warning');return}
     NM.setStatus(node.id,'processing');
-    runtime.aiThumbs=[];runtime.processedFrames=[];renderAiThumbGrid(node,content);
-    try{const lib=await loadAiLib();
-      $('#d_bgAiProg').style.display='block';$('#d_bgAiStatus').style.display='none';
-      for(let i=0;i<fs.length;i++){
-        const blob=await (await fetch(fs[i].dataUrl)).blob();const rb=await lib.removeBackground(blob);const url=URL.createObjectURL(rb);
-        const img=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=url});
-        runtime.processedFrames.push({id:fs[i].id,dataUrl:url,_w:img.width,_h:img.height,selected:true});
-        runtime.aiThumbs.push({index:i+1,url});
-        S.processedFrames=runtime.processedFrames;
-        $('#d_bgAiFill').style.width=(i+1)/fs.length*100+'%';$('#d_bgAiProgTxt').textContent=(i+1)+'/'+fs.length;
-        renderAiThumbGrid(node,content);
-      }
+    try{
+      if(config.aiMethod==='rmbg')await runRemoveBgWithRmbg(node,content,fs);
+      else await runRemoveBgWithImgly(node,content,fs);
       NM.setStatus(node.id,'done');NM.setSummary(node.id,fs.length+' 帧已处理');
       CM.pushData(node.id,'processed',{frames:runtime.processedFrames,summary:fs.length+' 帧已处理'});showToast('抠图完成','success');
-      $('#d_bgAiProg').style.display='none';$('#d_bgAiStatus').style.display='block';
       const startBtn=content.querySelector('#d_bgAiStart');if(startBtn)startBtn.textContent='重新抠图';
-    }catch(e){showToast('AI 抠图失败: '+e.message,'error');$('#d_bgAiProg').style.display='none';$('#d_bgAiStatus').style.display='block';const sb=content.querySelector('#d_bgAiStart');if(sb)sb.textContent='重试';NM.setStatus(node.id,'idle')}
+    }catch(e){showToast('AI 抠图失败: '+e.message,'error');content.querySelector('#d_bgAiProg').style.display='none';content.querySelector('#d_bgAiStatus').style.display='block';const sb=content.querySelector('#d_bgAiStart');if(sb)sb.textContent='重试';NM.setStatus(node.id,'idle')}
   });
-  // Color remove bg
   const cv=$('#pickerCanvas'),ctx=cv.getContext('2d'),cur=$('#pickerCursor');
-  getCurrentInputFrames().then(initialFrames=>{if(initialFrames.length){const img=new Image();img.onload=()=>{cv.width=img.width;cv.height=img.height;ctx.drawImage(img,0,0)};img.src=initialFrames[0].dataUrl}}).catch(()=>{});
-  cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();const x=Math.floor((e.clientX-r.left)*(cv.width/r.width)),y=Math.floor((e.clientY-r.top)*(cv.height/r.height));
-    cur.style.display='block';cur.style.left=(e.clientX-r.left)+'px';cur.style.top=(e.clientY-r.top)+'px';
-    if(x>=0&&x<cv.width&&y>=0&&y<cv.height){const px=ctx.getImageData(x,y,1,1).data;const hex=rgbHex(px[0],px[1],px[2]);$('#pickerPreviewColor').style.background=hex;$('#pickerPreviewHex').textContent=hex}});
+  getCurrentInputFrames().then(initialFrames=>{if(initialFrames.length){const img=new Image();img.onload=()=>{cv.width=img.width;cv.height=img.height;ctx.drawImage(img,0,0);updateRemoveBgInputPreview(node,content,getRemoveBgInputData(node))};img.src=initialFrames[0].dataUrl}}).catch(()=>{});
+  cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();const x=Math.floor((e.clientX-r.left)*(cv.width/r.width)),y=Math.floor((e.clientY-r.top)*(cv.height/r.height));cur.style.display='block';cur.style.left=(e.clientX-r.left)+'px';cur.style.top=(e.clientY-r.top)+'px';if(x>=0&&x<cv.width&&y>=0&&y<cv.height){const px=ctx.getImageData(x,y,1,1).data;const hex=rgbHex(px[0],px[1],px[2]);$('#pickerPreviewColor').style.background=hex;$('#pickerPreviewHex').textContent=hex}});
   cv.addEventListener('mouseleave',()=>cur.style.display='none');
   cv.addEventListener('click',e=>{const r=cv.getBoundingClientRect();const x=Math.floor((e.clientX-r.left)*(cv.width/r.width)),y=Math.floor((e.clientY-r.top)*(cv.height/r.height));const px=ctx.getImageData(x,y,1,1).data;S.selectedColor={r:px[0],g:px[1],b:px[2]};const hex=rgbHex(px[0],px[1],px[2]);$('#colorBox').style.background=hex;$('#colorValue').textContent=hex});
   $('#toleranceSlider').addEventListener('input',e=>{S.tolerance=parseInt(e.target.value);config.tolerance=S.tolerance;$('#toleranceValue').textContent=S.tolerance;PM.save()});
   $('#featherSlider').addEventListener('input',e=>{S.feather=parseInt(e.target.value);config.feather=S.feather;$('#featherValue').textContent=S.feather;PM.save()});
-  $('#previewRemoveBtn').addEventListener('click',async()=>{if(!S.selectedColor){showToast('先选背景色','warning');return}const fs2=await getCurrentInputFrames();if(!fs2.length)return;const img=new Image();img.onload=()=>{const tc=document.createElement('canvas');tc.width=img.width;tc.height=img.height;tc.getContext('2d').drawImage(img,0,0);const res=removeBg(tc,S.selectedColor,S.tolerance,S.feather);cv.width=res.width;cv.height=res.height;ctx.drawImage(res,0,0)};img.src=fs2[0].dataUrl});
-  $('#batchRemoveBtn').addEventListener('click',async()=>{if(!S.selectedColor){showToast('先选背景色','warning');return}const fs2=await getCurrentInputFrames();if(!fs2.length)return;showProgress('批量抠图...');S.processedFrames=[];NM.setStatus(node.id,'processing');
-    for(let i=0;i<fs2.length;i++){await new Promise(r=>{const img=new Image();img.onload=()=>{const tc=document.createElement('canvas');tc.width=img.width;tc.height=img.height;tc.getContext('2d').drawImage(img,0,0);const res=removeBg(tc,S.selectedColor,S.tolerance,S.feather);S.processedFrames.push({id:fs2[i].id,dataUrl:res.toDataURL('image/png'),_w:res.width,_h:res.height,selected:true});updateProgress((i+1)/fs2.length*100);r()};img.src=fs2[i].dataUrl})}
-    hideProgress();NM.setStatus(node.id,'done');NM.setSummary(node.id,fs2.length+' 帧已处理');
-    runtime.processedFrames=S.processedFrames;
-    CM.pushData(node.id,'processed',{frames:S.processedFrames,summary:fs2.length+' 帧已处理'});showToast('处理完成','success')});
+  $('#previewRemoveBtn').addEventListener('click',async()=>{if(!S.selectedColor){showToast('先选背景色','warning');return}const fs2=await getCurrentInputFrames();if(!fs2.length)return;const img=new Image();img.onload=()=>{const tc=document.createElement('canvas');tc.width=img.width;tc.height=img.height;tc.getContext('2d').drawImage(img,0,0);const res=removeBg(tc,S.selectedColor,S.tolerance,S.feather);cv.width=res.width;cv.height=res.height;ctx.drawImage(res,0,0);updateRemoveBgResultPreview(node,content,res.toDataURL('image/png'),'颜色预览')};img.src=fs2[0].dataUrl});
+  $('#batchRemoveBtn').addEventListener('click',async()=>{if(!S.selectedColor){showToast('先选背景色','warning');return}const fs2=await getCurrentInputFrames();if(!fs2.length)return;showProgress('批量抠图...');S.processedFrames=[];NM.setStatus(node.id,'processing');for(let i=0;i<fs2.length;i++){await new Promise(r=>{const img=new Image();img.onload=()=>{const tc=document.createElement('canvas');tc.width=img.width;tc.height=img.height;tc.getContext('2d').drawImage(img,0,0);const res=removeBg(tc,S.selectedColor,S.tolerance,S.feather);const dataUrl=res.toDataURL('image/png');S.processedFrames.push({id:fs2[i].id,dataUrl,_w:res.width,_h:res.height,selected:true});if(i===0)updateRemoveBgResultPreview(node,content,dataUrl,'颜色抠图结果');updateProgress((i+1)/fs2.length*100);r()};img.src=fs2[i].dataUrl})}hideProgress();NM.setStatus(node.id,'done');NM.setSummary(node.id,fs2.length+' 帧已处理');runtime.processedFrames=S.processedFrames;CM.pushData(node.id,'processed',{frames:S.processedFrames,summary:fs2.length+' 帧已处理'});showToast('处理完成','success')});
 }
 async function loadAiLib(){if(aiRemoveBgLib)return aiRemoveBgLib;const cdns=['https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.8/+esm','https://unpkg.com/@imgly/background-removal@1.5.8/dist/index.mjs'];
   for(const u of cdns){for(let a=1;a<=3;a++){try{showToast('加载 AI 模型'+(a>1?' (重试'+a+')':'')+'...','info',6000);const m=await Promise.race([import(u),new Promise((_,rej)=>setTimeout(()=>rej(new Error('超时')),60000))]);aiRemoveBgLib=m;return m}catch(e){if(a<3)await new Promise(r=>setTimeout(r,a*2000))}}}throw new Error('CDN 加载失败')}
+async function loadImageElement(src){return new Promise((res,rej)=>{const img=new Image();img.onload=()=>res(img);img.onerror=()=>rej(new Error('图片加载失败'));img.src=src})}
+async function runRmbgProbe(dataUrl){
+  const resp=await fetch('/api/rmbg/probe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl})});
+  const data=await resp.json().catch(()=>({ok:false,error:'后端返回了无效 JSON'}));
+  if(!resp.ok||!data.ok)throw new Error(data&&data.error?data.error:'RMBG 后端推理失败');
+  return {
+    backend:data.backend,
+    pythonExecutable:data.pythonExecutable,
+    frameworkVersion:data.frameworkVersion,
+    onnxruntimeVersion:data.onnxruntimeVersion,
+    inputName:data.inputName,
+    outputName:data.outputName,
+    inputDims:data.inputDims,
+    outputDims:data.outputDims,
+    sourceWidth:data.sourceWidth,
+    sourceHeight:data.sourceHeight,
+    targetWidth:data.targetWidth,
+    targetHeight:data.targetHeight,
+    outputUrl:data.dataUrl,
+    providers:data.providers,
+    availableProviders:data.availableProviders,
+    selectedProvider:data.selectedProvider,
+    requestedProviders:data.requestedProviders,
+    providerAttempts:data.providerAttempts,
+    rawOutputShape:data.rawOutputShape,
+    maskMin:data.maskMin,
+    maskMax:data.maskMax,
+  };
+}
 
 // --- Compose Sprite ---
 function bindComposeSprite(node,content){

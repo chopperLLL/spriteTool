@@ -120,6 +120,36 @@ describe('前端结构测试', () => {
         it('应该包含进度条', () => {
             assert.ok(htmlContent.includes('progress') || htmlContent.includes('progress-bar'), '应该包含进度显示');
         });
+
+        it('应该包含 RMBG-2 后端入口', () => {
+            assert.ok(htmlContent.includes('/model/RMBG-2'), '应该引用本地 RMBG-2 目录');
+            assert.ok(htmlContent.includes('RMBG-2（后端）'), '应该提供 RMBG-2 后端选项');
+        });
+
+        it('RMBG-2 应该走后端接口并展示推理元数据', () => {
+            assert.ok(htmlContent.includes("fetch('/api/rmbg/probe'"), 'RMBG-2 应调用后端接口');
+            assert.ok(htmlContent.includes('availableProviders') || htmlContent.includes('可用 provider'), '应展示可用 provider 信息');
+            assert.ok(htmlContent.includes('pythonExecutable') || htmlContent.includes('Python:'), '应展示 Python 信息');
+            assert.ok(htmlContent.includes('selectedProvider') || htmlContent.includes('推理端:'), '应展示当前 provider');
+        });
+
+        it('抠图节点应该支持单图导入', () => {
+            assert.ok(htmlContent.includes('d_bgLocalPick'), '应包含单图导入按钮');
+            assert.ok(htmlContent.includes('d_bgLocalFile'), '应包含单图文件输入');
+            assert.ok(htmlContent.includes('runtime.localImageData'), '应缓存本地图输入');
+        });
+
+        it('抠图节点应该支持 AI 方法选择', () => {
+            assert.ok(htmlContent.includes('d_bgAiMethod'), '应包含 AI 方法选择器');
+            assert.ok(htmlContent.includes('imgly（前端）'), '应提供 imgly 方法');
+            assert.ok(htmlContent.includes('RMBG-2（后端）'), '应提供 RMBG-2 方法');
+        });
+
+        it('抠图节点应该包含结果预览区域', () => {
+            assert.ok(htmlContent.includes('d_bgResultPreview'), '应包含抠图结果预览容器');
+            assert.ok(htmlContent.includes('d_bgResultLabel'), '应包含抠图结果标签');
+            assert.ok(htmlContent.includes('updateRemoveBgResultPreview('), '应存在抠图结果预览更新函数');
+        });
     });
 
     describe('CSS 样式', () => {
@@ -223,8 +253,8 @@ describe('v3 布局与节点状态', () => {
         assert.ok(htmlContent.includes('runtime:{}'), '节点实例应持有 runtime');
     });
 
-    it('应该保存 version 3 布局并提供旧布局迁移函数', () => {
-        assert.ok(htmlContent.includes('version:3'), '布局数据应声明 version 3');
+    it('应该保存 version 4 布局并提供旧布局迁移函数', () => {
+        assert.ok(htmlContent.includes('version:4'), '布局数据应声明 version 4');
         assert.ok(htmlContent.includes('migrateLegacyLayout('), '应存在旧布局迁移函数');
     });
 });

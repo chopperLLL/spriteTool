@@ -7,6 +7,14 @@ const JIMENG_DIR = path.join(__dirname, 'jimeng-free-api-all');
 const JIMENG_PORT = 18000;
 const SERVER_PORT = 3000;
 const RESULTS_DIR = path.join(__dirname, 'results');
+const RMBG_DIR = path.join(__dirname, 'model', 'RMBG-2');
+const RMBG_PYTHON = process.env.RMBG_PYTHON || 'C:\\Users\\chenlei\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe';
+const RMBG_MODEL_PATH = path.join(RMBG_DIR, 'model.onnx');
+const RMBG_PYTORCH_CONFIG_PATH = path.join(RMBG_DIR, 'config.json');
+const RMBG_PYTORCH_SAFETENSORS_PATH = path.join(RMBG_DIR, 'model.safetensors');
+const RMBG_PYTORCH_BIN_PATH = path.join(RMBG_DIR, 'pytorch_model.bin');
+const RMBG_INFER_SCRIPT = path.join(RMBG_DIR, 'infer.py');
+const RMBG_INFER_PYTORCH_SCRIPT = path.join(RMBG_DIR, 'infer_pytorch.py');
 const RESULT_SUBDIRS = {
     image: 'images',
     video: 'videos',
@@ -31,6 +39,7 @@ const MIME_TYPES = {
     '.webp': 'image/webp',
     '.mp4': 'video/mp4',
     '.webm': 'video/webm',
+    '.onnx': 'application/octet-stream',
     '.woff2': 'font/woff2',
 };
 
@@ -316,10 +325,275 @@ function serveStatic(req, res) {
         }
     });
 }
-
 function sendJSON(res, status, data) {
     res.writeHead(status, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(data));
+}
+
+function decodeImageDataUrl(dataUrl) {
+    if (typeof dataUrl !== 'string') throw new Error('缺少图片数据');
+    const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+    if (!match) throw new Error('只支持 base64 图片 data URL');
+    return {
+        mimeType: match[1],
+        buffer: Buffer.from(match[2], 'base64'),
+    };
+}
+
+function ensureRmbgInferScript() {
+    const script = `import argparse
+import json
+import os
+import sys
+import tempfile
+
+try:
+    import numpy as np
+    from PIL import Image
+    import onnxruntime as ort
+except ModuleNotFoundError as exc:
+    missing = getattr(exc, 'name', '') or 'unknown'
+    hint = f"缺少 Python 依赖 {missing}。CPU 方案可运行: python -m pip install onnxruntime pillow numpy。若你要 GPU 加速，请安装对应 GPU 版本的 onnxruntime（Windows NVIDIA 常见为 onnxruntime-gpu，Windows AMD/Intel 更适合 DirectML）。"
+    print(json.dumps({"ok": False, "error": hint}, ensure_ascii=False))
+    sys.exit(2)
+except Exception as exc:
+    print(json.dumps({"ok": False, "error": f"加载 Python 依赖失败: {exc}"}, ensure_ascii=False))
+    sys.exit(2)
+
+
+def normalize_dims(dims):
+    out = []
+    for dim in dims or []:
+        if isinstance(dim, int):
+            out.append(dim)
+        else:
+            out.append(None)
+    return out
+
+
+def choose_hw(dims, width, height):
+    dims = normalize_dims(dims)
+    h = dims[-2] if len(dims) >= 2 and isinstance(dims[-2], int) and dims[-2] and dims[-2] > 0 else None
+    w = dims[-1] if len(dims) >= 1 and isinstance(dims[-1], int) and dims[-1] and dims[-1] > 0 else None
+    if not w and not h:
+        return 1024, 1024
+    if not w:
+        ratio = width / max(height, 1)
+        w = max(1, int(round(h * ratio)))
+    if not h:
+        ratio = height / max(width, 1)
+        h = max(1, int(round(w * ratio)))
+    return int(w), int(h)
+
+
+def to_nchw(image, width, height):
+    rgb = image.convert('RGB').resize((width, height), Image.Resampling.LANCZOS)
+    arr = np.asarray(rgb).astype(np.float32) / 255.0
+    arr = np.transpose(arr, (2, 0, 1))[None, ...]
+    return arr
+
+
+def mask_from_output(output, width, height):
+    arr = np.asarray(output)
+    arr = np.squeeze(arr)
+    if arr.ndim == 3:
+        arr = arr[0]
+    if arr.ndim != 2:
+        raise RuntimeError(f'不支持的输出维度: {list(np.asarray(output).shape)}')
+    arr = arr.astype(np.float32)
+    min_v = float(arr.min())
+    max_v = float(arr.max())
+    if max_v - min_v < 1e-8:
+        arr = np.zeros_like(arr, dtype=np.float32)
+    else:
+        arr = (arr - min_v) / (max_v - min_v)
+    alpha = Image.fromarray(np.clip(arr * 255.0, 0, 255).astype(np.uint8), mode='L')
+    if alpha.size != (width, height):
+        alpha = alpha.resize((width, height), Image.Resampling.LANCZOS)
+    return alpha, min_v, max_v, list(np.asarray(output).shape)
+
+
+def choose_provider_candidates():
+    available = ort.get_available_providers()
+    preferred = [
+        'CUDAExecutionProvider',
+        'TensorrtExecutionProvider',
+        'DmlExecutionProvider',
+        'ROCMExecutionProvider',
+        'OpenVINOExecutionProvider',
+        'CPUExecutionProvider',
+    ]
+    candidates = [provider for provider in preferred if provider in available]
+    if 'CPUExecutionProvider' not in candidates:
+        candidates.append('CPUExecutionProvider')
+    return available, candidates
+
+
+def create_session_with_fallback(model_path):
+    available, candidates = choose_provider_candidates()
+    attempts = []
+    sess_options = ort.SessionOptions()
+    sess_options.log_severity_level = 0
+    sess_options.log_verbosity_level = 1
+    for provider in candidates:
+        try:
+            provider_list = [provider, 'CPUExecutionProvider'] if provider != 'CPUExecutionProvider' else ['CPUExecutionProvider']
+            session = ort.InferenceSession(model_path, sess_options=sess_options, providers=provider_list)
+            active = session.get_providers()
+            attempts.append({"provider": provider, "ok": True, "active": active})
+            if provider == 'CPUExecutionProvider' or provider in active:
+                return session, available, candidates, attempts, provider
+        except Exception as exc:
+            attempts.append({"provider": provider, "ok": False, "error": str(exc)})
+    session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+    attempts.append({"provider": 'CPUExecutionProvider', "ok": True, "active": session.get_providers(), "forced": True})
+    return session, available, candidates, attempts, 'CPUExecutionProvider'
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', required=True)
+    parser.add_argument('--input', required=True)
+    parser.add_argument('--output', required=True)
+    args = parser.parse_args()
+
+    image = Image.open(args.input)
+    source_width, source_height = image.size
+    session, available_providers, providers, attempts, selected_provider = create_session_with_fallback(args.model)
+    active_providers = session.get_providers()
+    input_name = session.get_inputs()[0].name
+    output_name = session.get_outputs()[0].name
+    input_shape = list(session.get_inputs()[0].shape)
+    output_shape = list(session.get_outputs()[0].shape)
+    target_width, target_height = choose_hw(input_shape, source_width, source_height)
+    tensor = to_nchw(image, target_width, target_height)
+    outputs = session.run([output_name], {input_name: tensor})
+    alpha, min_v, max_v, raw_shape = mask_from_output(outputs[0], source_width, source_height)
+    rgba = image.convert('RGBA')
+    rgba.putalpha(alpha)
+    rgba.save(args.output, format='PNG')
+    print(json.dumps({
+        "ok": True,
+        "pythonExecutable": sys.executable,
+        "onnxruntimeVersion": getattr(ort, '__version__', ''),
+        "inputName": input_name,
+        "outputName": output_name,
+        "inputDims": input_shape,
+        "outputDims": output_shape,
+        "rawOutputShape": raw_shape,
+        "sourceWidth": source_width,
+        "sourceHeight": source_height,
+        "targetWidth": target_width,
+        "targetHeight": target_height,
+        "maskMin": min_v,
+        "maskMax": max_v,
+        "providers": active_providers,
+        "selectedProvider": selected_provider,
+        "requestedProviders": providers,
+        "availableProviders": available_providers,
+        "providerAttempts": attempts,
+    }, ensure_ascii=False))
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
+        sys.exit(1)
+`;
+    fs.writeFileSync(RMBG_INFER_SCRIPT, script, 'utf8');
+}
+
+async function runRmbgInference(dataUrl) {
+    if (!fs.existsSync(RMBG_MODEL_PATH)) {
+        throw new Error(`未找到 RMBG 模型: ${RMBG_MODEL_PATH}`);
+    }
+    const hasPytorchWeights = fs.existsSync(RMBG_PYTORCH_CONFIG_PATH) && (fs.existsSync(RMBG_PYTORCH_SAFETENSORS_PATH) || fs.existsSync(RMBG_PYTORCH_BIN_PATH));
+    const { buffer } = decodeImageDataUrl(dataUrl);
+    const tmpDir = fs.mkdtempSync(path.join(RMBG_DIR, 'tmp-'));
+    const inputPath = path.join(tmpDir, 'input.png');
+    const outputPath = path.join(tmpDir, 'output.png');
+    fs.writeFileSync(inputPath, buffer);
+    try {
+        const scriptPath = hasPytorchWeights ? RMBG_INFER_PYTORCH_SCRIPT : RMBG_INFER_SCRIPT;
+        if (hasPytorchWeights) {
+            log('[RMBG] 优先使用 PyTorch CUDA 脚本');
+        } else {
+            log('[RMBG] 未检测到 PyTorch 权重，回退 ONNX');
+            ensureRmbgInferScript();
+        }
+        const args = hasPytorchWeights
+            ? [scriptPath, '--model-dir', RMBG_DIR, '--input', inputPath, '--output', outputPath]
+            : [scriptPath, '--model', RMBG_MODEL_PATH, '--input', inputPath, '--output', outputPath];
+        const result = await new Promise((resolve, reject) => {
+            const child = spawn(RMBG_PYTHON, args, {
+                cwd: RMBG_DIR,
+                stdio: ['ignore', 'pipe', 'pipe'],
+            });
+            const stdout = [];
+            const stderr = [];
+            child.stdout.on('data', chunk => stdout.push(Buffer.from(chunk)));
+            child.stderr.on('data', chunk => {
+                const text = Buffer.from(chunk).toString('utf8');
+                stderr.push(Buffer.from(chunk));
+                if (text.trim()) log('[RMBG][py-stderr] ' + text.trim());
+            });
+            child.on('error', reject);
+            child.on('close', code => {
+                const outText = Buffer.concat(stdout).toString('utf8').trim();
+                const errText = Buffer.concat(stderr).toString('utf8').trim();
+                let payload = null;
+                if (outText) {
+                    const lastLine = outText.split(/\r?\n/).filter(Boolean).slice(-1)[0];
+                    try { payload = JSON.parse(lastLine); } catch {}
+                }
+                if (code !== 0) {
+                    const message = payload && payload.error ? payload.error : (errText || outText || `Python exited with code ${code}`);
+                    return reject(new Error(message));
+                }
+                if (!payload || !payload.ok) {
+                    return reject(new Error((payload && payload.error) || 'RMBG 推理未返回成功结果'));
+                }
+                if (!fs.existsSync(outputPath)) {
+                    return reject(new Error('RMBG 推理未生成输出图片'));
+                }
+                const outputBuffer = fs.readFileSync(outputPath);
+                resolve({
+                    ...payload,
+                    dataUrl: `data:image/png;base64,${outputBuffer.toString('base64')}`,
+                });
+            });
+        });
+        log('[RMBG] python=' + (result.pythonExecutable || RMBG_PYTHON));
+        log('[RMBG] backend=' + String(result.backend || 'unknown'));
+        log('[RMBG] runtime=' + (result.frameworkVersion || result.onnxruntimeVersion || 'unknown'));
+        log('[RMBG] availableProviders=' + JSON.stringify(result.availableProviders || []));
+        log('[RMBG] activeProviders=' + JSON.stringify(result.providers || []));
+        log('[RMBG] selectedProvider=' + String(result.selectedProvider || 'unknown'));
+        log('[RMBG] providerAttempts=' + JSON.stringify(result.providerAttempts || []));
+        log('[RMBG] requestedProviders=' + JSON.stringify(result.requestedProviders || []));
+        log('[RMBG] source=' + String(result.sourceWidth || '?') + 'x' + String(result.sourceHeight || '?') + ' target=' + String(result.targetWidth || '?') + 'x' + String(result.targetHeight || '?'));
+        return result;
+    } finally {
+        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    }
+}
+
+
+async function handleRmbgApi(req, res) {
+    if (req.url !== '/api/rmbg/probe' || req.method !== 'POST') {
+        return sendJSON(res, 404, { error: 'Not Found' });
+    }
+    try {
+        const body = JSON.parse((await collectBody(req)).toString('utf8') || '{}');
+        if (!body || typeof body.dataUrl !== 'string') {
+            return sendJSON(res, 400, { ok: false, error: '缺少 dataUrl' });
+        }
+        const result = await runRmbgInference(body.dataUrl);
+        return sendJSON(res, 200, { ok: true, ...result });
+    } catch (err) {
+        return sendJSON(res, 500, { ok: false, error: err.message });
+    }
 }
 
 function ensureResultsStore() {
@@ -625,6 +899,9 @@ async function main() {
 
         if (req.url === '/api/health' || req.url.startsWith('/api/jimeng-service/')) {
             return handleControlApi(req, res);
+        }
+        if (req.url.startsWith('/api/rmbg/')) {
+            return handleRmbgApi(req, res);
         }
         if (req.url.startsWith('/api/results')) {
             return handleResultsApi(req, res);
